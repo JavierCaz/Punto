@@ -30,14 +30,18 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files — never commit real values; keep a .env.example instead
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
 
-example
-
+# build artifacts
+*.apk
+*.aab
+*.ipa
 # generated native folders
 /ios
 /android
