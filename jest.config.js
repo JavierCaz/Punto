@@ -8,4 +8,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  // Test doubles (e.g. src/db/repositories/__tests__/fakes/*.ts) are helpers,
+  // not suites — keep them out of the test runner.
+  testPathIgnorePatterns: ['/node_modules/', '/__tests__/fakes/'],
 };

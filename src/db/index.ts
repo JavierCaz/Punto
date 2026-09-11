@@ -13,3 +13,8 @@ export { DATABASE_NAME, getDb, resetDbForTesting, runMigrations } from '@/db/cli
 export type { Database } from '@/db/client';
 export type { Migration } from '@/db/types';
 export { LATEST_SCHEMA_VERSION, migrations } from '@/db/migrations';
+
+
+// Typed data-access layer (repositories). Import business data access from
+// '@/db' so screens have a single database import surface.
+export * from '@/db/repositories';
