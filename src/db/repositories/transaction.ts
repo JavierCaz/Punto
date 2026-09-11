@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import type { DatabaseAdapter } from '@/db/repositories/database';
 

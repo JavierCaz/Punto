@@ -17,8 +17,8 @@ import type { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recordi
  *
  * Typical test setup:
  *
- *   jest.mock('@/db', () => ({ getDb: jest.fn() }));
- *   import { getDb } from '@/db';
+ *   jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
+ *   import { getDb } from '@/db/client';
  *   const adapter = new RecordingAdapter();
  *   (getDb as jest.Mock).mockResolvedValue(makeFakeDb(adapter));
  */

@@ -7,7 +7,7 @@
  */
 
 
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
@@ -20,7 +20,7 @@ import {
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 
-jest.mock('@/db', () => ({ getDb: jest.fn() }));
+jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 
 // A full, live supplier row as SQLite would surface it (snake_case).
 const supplierRow = {

@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import { nowIso } from '@/db/repositories/clock';
 import type { DatabaseAdapter } from '@/db/repositories/database';

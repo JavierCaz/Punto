@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import { getBusinessId } from '@/db/repositories/business-scope';
 import { assertSufficientStock } from '@/db/repositories/calc';

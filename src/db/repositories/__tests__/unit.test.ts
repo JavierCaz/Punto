@@ -10,7 +10,7 @@
  * "removal" is expressed as `is_active = 0` rather than soft-delete.
  */
 
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
@@ -23,7 +23,7 @@ import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 import type { UnitType } from '@/db/repositories/types';
 
-jest.mock('@/db', () => ({ getDb: jest.fn() }));
+jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 
 // A full, active unit row as SQLite would surface it (snake_case).
 const unitRow = {

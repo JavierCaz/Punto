@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import { REPO_ERROR, repoError } from '@/db/repositories/errors';
 

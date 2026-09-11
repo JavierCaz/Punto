@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import { nextSaleNumber } from '@/db/repositories/app-metadata';
 import { getBusinessId } from '@/db/repositories/business-scope';

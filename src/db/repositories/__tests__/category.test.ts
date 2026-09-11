@@ -5,7 +5,7 @@
  * (no native SQLite — see AGENTS §9.4).
  */
 
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import {
@@ -20,7 +20,7 @@ import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 
-jest.mock('@/db', () => ({ getDb: jest.fn() }));
+jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn(() => 'uuid-test') }));
 
 /** A canonical live category row used to seed the fake across tests. */

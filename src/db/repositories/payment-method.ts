@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 
 import { getBusinessId } from '@/db/repositories/business-scope';
 import { nowIso } from '@/db/repositories/clock';

@@ -7,7 +7,7 @@
  * `locale` / `accent_color` validation the repository relies on.
  */
 
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 import {
   getBusinessProfile,
   updateBusinessProfile,
@@ -18,7 +18,7 @@ import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 
-jest.mock('@/db', () => ({ getDb: jest.fn() }));
+jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 
 // A full, live business row as SQLite would surface it (snake_case).
 const businessRow = {

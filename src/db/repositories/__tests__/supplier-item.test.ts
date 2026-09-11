@@ -8,7 +8,7 @@
  * coercions, and the hard-delete NOT_FOUND semantics.
  */
 
-import { getDb } from '@/db';
+import { getDb } from '@/db/client';
 import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
@@ -20,7 +20,7 @@ import {
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 
-jest.mock('@/db', () => ({ getDb: jest.fn() }));
+jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn(() => 'uuid-test') }));
 
 // A full supplier_item row as SQLite would surface it (snake_case).
