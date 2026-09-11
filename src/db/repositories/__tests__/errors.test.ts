@@ -79,6 +79,24 @@ describe('mapSqliteError', () => {
     }
   });
 
+  it('remaps real expo-sqlite "Error code N: … constraint failed" messages', () => {
+    const foreignKey = mapSqliteError(new Error('Error code 19: FOREIGN KEY constraint failed'));
+    expect(isRepoError(foreignKey, REPO_ERROR.CONSTRAINT)).toBe(true);
+
+    const check = mapSqliteError(
+      new Error('Error code 19: CHECK constraint failed: price_minor >= 0'),
+    );
+    expect(isRepoError(check, REPO_ERROR.CONSTRAINT)).toBe(true);
+
+    const notNull = mapSqliteError(
+      new Error('Error code 19: NOT NULL constraint failed: product.name'),
+    );
+    expect(isRepoError(notNull, REPO_ERROR.CONSTRAINT)).toBe(true);
+
+    const unique = mapSqliteError(new Error('Error code 19: UNIQUE constraint failed: product.name'));
+    expect(isRepoError(unique, REPO_ERROR.DUPLICATE)).toBe(true);
+  });
+
   it('rethrows non-constraint errors unchanged', () => {
     const original = new Error('database is locked');
     expect(() => mapSqliteError(original)).toThrow(original);

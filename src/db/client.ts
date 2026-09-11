@@ -20,6 +20,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import { migrations } from '@/db/migrations';
+import { rollbackQuietly } from '@/db/rollback';
 
 export const DATABASE_NAME = 'punto.db';
 
@@ -65,8 +66,10 @@ export function resetDbForTesting(): void {
  * Run pending migrations, keyed off `PRAGMA user_version` (single source of
  * truth for schema version — we do not mirror it in app_metadata).
  *
- * Migrations are append-only and immutable; each runs inside a transaction so
- * a failure rolls back cleanly and user_version is only bumped on success.
+ * Migrations are append-only and immutable. Each runs on the passed `db`
+ * connection inside `BEGIN IMMEDIATE`, so the DDL and the `user_version` bump
+ * commit together (or roll back together on failure). This deliberately avoids
+ * `withExclusiveTransactionAsync`, which is unsupported on web.
  */
 export async function runMigrations(db: Database): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
@@ -75,12 +78,16 @@ export async function runMigrations(db: Database): Promise<void> {
   for (const migration of migrations) {
     if (migration.version <= currentVersion) continue;
 
-    await db.withExclusiveTransactionAsync(async () => {
+    await db.execAsync('BEGIN IMMEDIATE');
+    try {
       for (const statement of migration.up) {
         await db.execAsync(statement);
       }
-    });
-
-    await db.execAsync(`PRAGMA user_version = ${migration.version}`);
+      await db.execAsync(`PRAGMA user_version = ${migration.version}`);
+      await db.execAsync('COMMIT');
+    } catch (error) {
+      await rollbackQuietly(db);
+      throw error;
+    }
   }
 }

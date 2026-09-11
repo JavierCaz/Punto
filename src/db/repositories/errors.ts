@@ -68,11 +68,14 @@ export function mapSqliteError(error: unknown): RepoError {
     return repoError(REPO_ERROR.DUPLICATE, message);
   }
 
+  // expo-sqlite surfaces SQLite errors as `Error code <n>: <sqlite3_errmsg>`,
+  // e.g. "Error code 19: FOREIGN KEY constraint failed". Match the canonical
+  // message text as well as the extended-code strings so CHECK / NOT NULL /
+  // FOREIGN KEY failures all normalize to REPO_CONSTRAINT.
   const isConstraint =
-    message.includes('SQLITE_CONSTRAINT_CHECK') ||
-    message.includes('SQLITE_CONSTRAINT_NOTNULL') ||
-    message.includes('SQLITE_CONSTRAINT_FOREIGNKEY') ||
-    message.includes('SQLITE_CONSTRAINT');
+    /constraint failed/i.test(message) ||
+    message.includes('SQLITE_CONSTRAINT') ||
+    message.includes('constraint violation');
 
   if (isConstraint) {
     return repoError(REPO_ERROR.CONSTRAINT, message);

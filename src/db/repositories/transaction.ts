@@ -1,29 +1,39 @@
 import { getDb } from '@/db/client';
+import { rollbackQuietly } from '@/db/rollback';
 
 import type { DatabaseAdapter } from '@/db/repositories/database';
 
 /**
- * Run `fn` inside a single exclusive SQLite transaction, exposing the active
- * transaction handle as a `DatabaseAdapter`.
+ * The only transaction entry point. Runs `fn` on the main database connection
+ * inside `BEGIN IMMEDIATE`, exposing the handle as a `DatabaseAdapter`.
  *
- * This is the ONLY place a transaction is opened: repositories never call
- * `withExclusiveTransactionAsync` themselves. Because `DatabaseAdapter` has no
- * transaction method, a repository cannot (accidentally) nest transactions —
- * the inner code only ever sees a plain query surface.
- *
- * Implementation note: expo-sqlite's `withExclusiveTransactionAsync` types the
- * task as `(txn) => Promise<void>` and resolves `Promise<void>`, so we capture
- * the task's result via a definite-assignment variable and return it after the
- * transaction commits (or let the rejection propagate on rollback). The single
- * `as unknown as DatabaseAdapter` cast bridges expo-sqlite's non-exported
- * `Transaction` type to our adapter seam; it is contained here by design.
+ * expo-sqlite's `withExclusiveTransactionAsync` is deliberately NOT used: it
+ * opens a separate native connection that does not inherit the main
+ * connection's `PRAGMA foreign_keys = ON`, so writes there skip FK enforcement
+ * (and it is unsupported on web). The module-level queue serializes writes so
+ * statements on the shared connection never interleave.
  */
-export async function withTransaction<T>(fn: (txn: DatabaseAdapter) => Promise<T>): Promise<T> {
-  const db = await getDb();
 
-  let result!: T;
-  await db.withExclusiveTransactionAsync(async (txn) => {
-    result = await fn(txn as unknown as DatabaseAdapter);
-  });
-  return result;
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+export function withTransaction<T>(fn: (txn: DatabaseAdapter) => Promise<T>): Promise<T> {
+  const run = async (): Promise<T> => {
+    const db = await getDb();
+    await db.execAsync('BEGIN IMMEDIATE');
+    try {
+      const result = await fn(db as unknown as DatabaseAdapter);
+      await db.execAsync('COMMIT');
+      return result;
+    } catch (error) {
+      await rollbackQuietly(db);
+      throw error;
+    }
+  };
+
+  const next = writeQueue.then(run);
+  writeQueue = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
 }

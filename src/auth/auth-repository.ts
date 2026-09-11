@@ -3,7 +3,7 @@ import * as Crypto from 'expo-crypto';
 import { loginLimiter } from '@/auth/lockout';
 import { normalizeUsername, isAuthRole } from '@/auth/validation';
 import type { AuthRole } from '@/auth/types';
-import { getDb } from '@/db';
+import { getDb, withTransaction } from '@/db';
 import { verifySecret, needsRehash, hashSecret } from '@/lib/hash';
 
 /**
@@ -111,12 +111,11 @@ export async function onboardBusiness(input: {
   passwordHash: string;
 }): Promise<{ businessId: string; employeeId: string }> {
   const username = normalizeUsername(input.username);
-  const db = await getDb();
   const timestamp = nowIso();
   const businessId = Crypto.randomUUID();
   const employeeId = Crypto.randomUUID();
 
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await withTransaction(async (txn) => {
     const existing = await txn.getFirstAsync<{ id: string }>(
       'SELECT id FROM business LIMIT 1',
     );
@@ -237,13 +236,14 @@ export async function signIn(
   loginLimiter.recordSuccess(username);
 
   // Transparently upgrade weak legacy hashes on successful login.
-  if (needsRehash(storedHash)) {
-    const upgraded = await hashSecret(secret);
-    const hashColumn = employee.role === 'ADMIN' ? 'password_hash' : 'pin_hash';
-    await db.runAsync(`UPDATE employee SET ${hashColumn} = ? WHERE id = ?`, upgraded, employee.id);
-  }
-
-  await db.runAsync('UPDATE employee SET last_login_at = ? WHERE id = ?', nowIso(), employee.id);
+  const hashColumn = employee.role === 'ADMIN' ? 'password_hash' : 'pin_hash';
+  const upgraded = needsRehash(storedHash) ? await hashSecret(secret) : null;
+  await withTransaction(async (txn) => {
+    if (upgraded) {
+      await txn.runAsync(`UPDATE employee SET ${hashColumn} = ? WHERE id = ?`, upgraded, employee.id);
+    }
+    await txn.runAsync('UPDATE employee SET last_login_at = ? WHERE id = ?', nowIso(), employee.id);
+  });
 
   return { ok: true, user: toPublicEmployee(employee) };
 }
@@ -279,40 +279,41 @@ export async function createEmployee(input: {
   pinHash: string;
 }): Promise<ReturnType<typeof toPublicEmployee>> {
   const username = normalizeUsername(input.username);
-  const db = await getDb();
   const timestamp = nowIso();
   const employeeId = Crypto.randomUUID();
 
-  const business = await db.getFirstAsync<{ id: string }>('SELECT id FROM business LIMIT 1');
-  if (!business) {
-    throw new Error('AUTH_NO_BUSINESS');
-  }
+  return withTransaction(async (txn) => {
+    const business = await txn.getFirstAsync<{ id: string }>('SELECT id FROM business LIMIT 1');
+    if (!business) {
+      throw new Error('AUTH_NO_BUSINESS');
+    }
 
-  const existing = await db.getFirstAsync<{ id: string }>("SELECT id FROM employee WHERE username = ? AND archived_at IS NULL", username);
-  if (existing) {
-    throw new Error('AUTH_USERNAME_TAKEN');
-  }
+    const existing = await txn.getFirstAsync<{ id: string }>("SELECT id FROM employee WHERE username = ? AND archived_at IS NULL", username);
+    if (existing) {
+      throw new Error('AUTH_USERNAME_TAKEN');
+    }
 
-  await db.runAsync(
-    `INSERT INTO employee
-       (id, business_id, first_name, last_name, username, role,
-        pin_hash, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'EMPLOYEE', ?, 1, ?, ?)`,
-    employeeId,
-    business.id,
-    input.firstName.trim(),
-    input.lastName?.trim() || null,
-    username,
-    input.pinHash,
-    timestamp,
-    timestamp,
-  );
+    await txn.runAsync(
+      `INSERT INTO employee
+         (id, business_id, first_name, last_name, username, role,
+          pin_hash, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'EMPLOYEE', ?, 1, ?, ?)`,
+      employeeId,
+      business.id,
+      input.firstName.trim(),
+      input.lastName?.trim() || null,
+      username,
+      input.pinHash,
+      timestamp,
+      timestamp,
+    );
 
-  const row = await db.getFirstAsync<Record<string, unknown>>(
-    `SELECT ${EMPLOYEE_COLUMNS} FROM employee WHERE id = ?`,
-    employeeId,
-  );
-  return toPublicEmployee(mapEmployeeRow(row as Record<string, unknown>));
+    const row = await txn.getFirstAsync<Record<string, unknown>>(
+      `SELECT ${EMPLOYEE_COLUMNS} FROM employee WHERE id = ?`,
+      employeeId,
+    );
+    return toPublicEmployee(mapEmployeeRow(row as Record<string, unknown>));
+  });
 }
 
 /**
@@ -320,9 +321,7 @@ export async function createEmployee(input: {
  * same transaction as the write (Oracle-reviewed).
  */
 export async function archiveEmployee(actorEmployeeId: string, targetEmployeeId: string): Promise<void> {
-  const db = await getDb();
-
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await withTransaction(async (txn) => {
     const target = await txn.getFirstAsync<Record<string, unknown>>(
       `SELECT ${EMPLOYEE_COLUMNS} FROM employee WHERE id = ?`,
       targetEmployeeId,
