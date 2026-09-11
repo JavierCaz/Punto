@@ -1,15 +1,16 @@
 import * as Crypto from 'expo-crypto';
-import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+
+import { pbkdf2Hex } from '@/lib/pbkdf2';
 
 /**
  * Password/PIN hashing — salted PBKDF2-HMAC-SHA256.
  *
  * Choice rationale (see AGENTS.md §9.1 and the auth research notes):
  * - `expo-crypto` provides the CSPRNG salt but NO key-derivation function, so
- *   the KDF comes from `@noble/hashes` (pure JS, zero deps, works on Hermes +
- *   web + jest).
+ *   the KDF is delegated to `@/lib/pbkdf2`: native OpenSSL on device
+ *   (react-native-quick-crypto), WebCrypto on web, and `@noble/hashes` as the
+ *   pure-JS fallback + Jest reference.
  * - One scheme for both admin passwords and employee PINs. The PIN's real
  *   protection on a shared offline POS is app-level attempt lockout + OS disk
  *   encryption; hashing keeps the DB/JSON export free of recoverable
@@ -20,15 +21,14 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
  *
  * The iteration count is stored in-band so it can be raised later without
  * breaking existing rows (verify then rehash). Iterations are intentionally
- * configurable for tests — 150k is the production default, calibrated for
- * ~250–400 ms on POS hardware.
+ * configurable for tests — 150k is the production default. With the native KDF
+ * this stays well under a second on device.
  */
 
 export const PBKDF2_ITERATIONS = 150_000;
 
 const ALGORITHM = 'pbkdf2-sha256';
 const SALT_BYTES = 16;
-const DK_BYTES = 32;
 
 export type HashOptions = {
   iterations?: number;
@@ -46,11 +46,7 @@ export async function deriveKey(
   saltHex: string,
   iterations: number,
 ): Promise<string> {
-  const dk = await pbkdf2Async(sha256, secret, hexToBytes(saltHex), {
-    c: iterations,
-    dkLen: DK_BYTES,
-  });
-  return bytesToHex(dk);
+  return pbkdf2Hex(secret, saltHex, iterations);
 }
 
 /**

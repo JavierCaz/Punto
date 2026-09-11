@@ -35,11 +35,18 @@
       ],
       "expo-sqlite",
       "expo-localization",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "react-native-quick-crypto"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "930b3aa8-2d3e-46bf-80e5-d9eb8d4db54c"
+      }
     }
   }
 }
