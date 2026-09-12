@@ -2,7 +2,12 @@ import { getDb } from '@/db/client';
 
 import { nextSaleNumber } from '@/db/repositories/app-metadata';
 import { getBusinessId } from '@/db/repositories/business-scope';
-import { computeChangeMinor, sumMinor } from '@/db/repositories/calc';
+import {
+  computeChangeMinor,
+  computeIngredientCostMinor,
+  computeRecipeConsumptionMilli,
+  sumMinor,
+} from '@/db/repositories/calc';
 import { nowIso } from '@/db/repositories/clock';
 import type { DatabaseAdapter, SqlValue } from '@/db/repositories/database';
 import { REPO_ERROR, mapSqliteError, repoError } from '@/db/repositories/errors';
@@ -476,13 +481,23 @@ async function consumeSaleItemStockWithTxn(
     return; // untracked
   }
 
-  const ingredients = await txn.getAllAsync<{ inventory_item_id: string; quantity: number }>(
-    `SELECT inventory_item_id, quantity FROM recipe_item
-      WHERE recipe_id = ? ORDER BY sort_order ASC, id ASC`,
+  // The ingredient's OWN cost cache is the correct cost basis for the stock it
+  // consumes — not the sold product's line snapshot (v1 previously used the
+  // product cost for every ingredient, which mis-stated COGS for recipe items).
+  const ingredients = await txn.getAllAsync<{
+    inventory_item_id: string;
+    quantity: number;
+    unit_cost_minor: number;
+  }>(
+    `SELECT ri.inventory_item_id, ri.quantity, ii.unit_cost_minor
+       FROM recipe_item ri
+       JOIN inventory_item ii ON ii.id = ri.inventory_item_id
+      WHERE ri.recipe_id = ?
+      ORDER BY ri.sort_order ASC, ri.id ASC`,
     recipe.id,
   );
   for (const ingredient of ingredients) {
-    const consumed = Math.round((ingredient.quantity * item.quantity) / 1000);
+    const consumed = computeRecipeConsumptionMilli(ingredient.quantity, item.quantity);
     // Guard: recordMovementWithTxn rejects a zero quantity. A recipe line can
     // legitimately round to zero at tiny quantities, which is a no-op.
     if (consumed === 0) {
@@ -492,7 +507,7 @@ async function consumeSaleItemStockWithTxn(
       inventoryItemId: ingredient.inventory_item_id,
       type: 'SALE',
       quantity: -consumed,
-      unitCostMinor: item.unit_cost_minor,
+      unitCostMinor: computeIngredientCostMinor(consumed, ingredient.unit_cost_minor),
       referenceType: 'sale',
       referenceId: saleId,
       employeeId: employeeId ?? undefined,

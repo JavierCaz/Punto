@@ -47,6 +47,9 @@ export type { Page, PageQuery } from '@/db/repositories/pagination';
 export {
   assertSufficientStock,
   computeChangeMinor,
+  computeIngredientCostMinor,
+  computeRecipeConsumptionMilli,
+  computeRecipeCostMinor,
   computeTaxMinor,
   scaleQuantityByCount,
   sumMinor,
@@ -106,7 +109,14 @@ export type {
 } from '@/db/repositories/business';
 
 // Units of measure.
-export { createUnit, getUnitById, listUnits, updateUnit } from '@/db/repositories/unit';
+export {
+  DEFAULT_UNITS,
+  createUnit,
+  ensureDefaultUnits,
+  getUnitById,
+  listUnits,
+  updateUnit,
+} from '@/db/repositories/unit';
 export type { CreateUnitInput, Unit, UpdateUnitInput } from '@/db/repositories/unit';
 
 // Categories.

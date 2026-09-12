@@ -83,3 +83,47 @@ export function assertSufficientStock(
     throw repoError(REPO_ERROR.INSUFFICIENT_STOCK);
   }
 }
+
+/**
+ * Ingredient quantity consumed by selling `lineQuantityMilli` of a product
+ * whose recipe uses `recipeQuantityMilli` of the ingredient per portion.
+ *
+ * Both quantities are milli-units of the same inventory item's unit; the
+ * product is rounded to the nearest milli-unit so a sale always posts an
+ * integer-exact ledger delta (AGENTS §6 — never floats). A tiny quantity may
+ * legitimately round to 0, which callers treat as a no-op.
+ */
+export function computeRecipeConsumptionMilli(
+  recipeQuantityMilli: number,
+  lineQuantityMilli: number,
+): number {
+  return Math.round((recipeQuantityMilli * lineQuantityMilli) / 1000);
+}
+
+/**
+ * Cost, in integer minor currency, of consuming `consumedMilli` of an
+ * ingredient whose cost is `unitCostMinor` per DISPLAY unit. `consumedMilli`
+ * is milli-units, so the cost is scaled by 1000 and rounded to the nearest
+ * minor unit.
+ */
+export function computeIngredientCostMinor(
+  consumedMilli: number,
+  unitCostMinor: number,
+): number {
+  return Math.round((consumedMilli * unitCostMinor) / 1000);
+}
+
+/**
+ * Cost, in integer minor currency, of ONE recipe portion: the sum of every
+ * ingredient's `quantityMilli × unitCostMinor / 1000` (each rounded). Used to
+ * surface a recipe's estimated cost in the builder and to snapshot cost on
+ * sale lines.
+ */
+export function computeRecipeCostMinor(
+  items: readonly { quantityMilli: number; unitCostMinor: number }[],
+): number {
+  return items.reduce(
+    (total, item) => total + computeIngredientCostMinor(item.quantityMilli, item.unitCostMinor),
+    0,
+  );
+}

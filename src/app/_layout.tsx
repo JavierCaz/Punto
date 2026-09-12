@@ -138,6 +138,9 @@ export default function RootLayout() {
               <Stack.Screen name="team" />
               <Stack.Screen name="products" />
               <Stack.Screen name="categories" />
+              <Stack.Screen name="inventory" />
+              <Stack.Screen name="suppliers" />
+              <Stack.Screen name="purchases" />
             </Stack.Protected>
           </Stack>
         ) : null}

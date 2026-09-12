@@ -174,6 +174,69 @@ describe('purchase repository', () => {
       expect(result.items[0].subtotalMinor).toBe(300);
     });
 
+    it('sums multi-line subtotals into the header total and posts one PURCHASE movement per line', async () => {
+      const twoLinePurchaseRow = { ...purchaseRow, id: 'pur-2', subtotal_minor: 1133, total_minor: 1133 };
+      const lineRow1 = { ...purchaseItemRow, inventory_item_id: 'item-1', quantity: 1500, unit_cost_minor: 200, subtotal_minor: 300 };
+      const lineRow2 = { ...purchaseItemRow, id: 'pitem-2', inventory_item_id: 'item-2', quantity: 2500, unit_id: 'unit-g', unit_cost_minor: 333, subtotal_minor: 833 };
+
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('SELECT value FROM app_metadata', { value: '5' });
+      // line 1 — pre-receipt cost cache + movement item read + flag.
+      adapter.queueFirst('SELECT current_quantity, unit_cost_minor', { current_quantity: 0, unit_cost_minor: 0 });
+      adapter.queueFirst('FROM inventory_item', { id: 'item-1', unit_id: 'unit-g', current_quantity: 0 });
+      adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
+      // line 2 — pre-receipt cost cache + movement item read + flag.
+      adapter.queueFirst('SELECT current_quantity, unit_cost_minor', { current_quantity: 500, unit_cost_minor: 200 });
+      adapter.queueFirst('FROM inventory_item', { id: 'item-2', unit_id: 'unit-g', current_quantity: 500 });
+      adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
+      // select-back header + lines.
+      adapter.queueFirst('FROM purchase', twoLinePurchaseRow);
+      adapter.queueAll('FROM purchase_item', [lineRow1, lineRow2]);
+
+      const result = await createPurchase({
+        supplierId: 'sup-1',
+        employeeId: 'emp-1',
+        notes: 'restock',
+        items: [
+          { inventoryItemId: 'item-1', quantity: 1500, unitId: 'unit-g', unitCostMinor: 200 },
+          { inventoryItemId: 'item-2', quantity: 2500, unitId: 'unit-g', unitCostMinor: 333 },
+        ],
+      });
+
+      // Header total = sum of line subtotals (Math.round(qty × unitCost / 1000)).
+      const purchaseInsert = adapter.calls.find(
+        (c) => c.sql.includes('INSERT INTO purchase') && !c.sql.includes('purchase_item'),
+      );
+      expect(purchaseInsert).toBeDefined();
+      expect(purchaseInsert!.params[4]).toBe(1133); // subtotal = 300 + 833
+      expect(purchaseInsert!.params[7]).toBe(1133); // total = subtotal (no tax/discount in v1)
+
+      // One PURCHASE movement per line, with the positive received quantity.
+      const movements = adapter.calls.filter((c) => c.sql.includes('INSERT INTO inventory_movement'));
+      expect(movements).toHaveLength(2);
+      expect(movements[0].params[3]).toBe('PURCHASE');
+      expect(movements[0].params[4]).toBe(1500);
+      expect(movements[1].params[3]).toBe('PURCHASE');
+      expect(movements[1].params[4]).toBe(2500);
+
+      // Line subtotals are integer-exact (round half-up).
+      const itemInserts = adapter.calls.filter((c) => c.sql.includes('INSERT INTO purchase_item'));
+      expect(itemInserts).toHaveLength(2);
+      expect(itemInserts[0].params[6]).toBe(300); // 1500 × 200 / 1000
+      expect(itemInserts[1].params[6]).toBe(833); // 2500 × 333 / 1000 = 832.5 → 833
+
+      // Weighted-average unit cost refreshes after each line.
+      const costUpdates = adapter.calls.filter(
+        (c) => c.sql.includes('UPDATE inventory_item') && c.sql.includes('unit_cost_minor = ?'),
+      );
+      expect(costUpdates).toHaveLength(2);
+      expect(costUpdates[0].params[0]).toBe(200); // (0×0 + 1500×200) / 1500
+      expect(costUpdates[1].params[0]).toBe(311); // (500×200 + 2500×333) / 3000
+
+      expect(result.items).toHaveLength(2);
+      expect(result.totalMinor).toBe(1133);
+    });
+
     it('throws REPO_INVALID_STATE on empty items with no writes', async () => {
       adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
 

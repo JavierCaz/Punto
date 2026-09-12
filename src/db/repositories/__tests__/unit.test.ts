@@ -15,6 +15,7 @@ import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
   createUnit,
+  ensureDefaultUnits,
   getUnitById,
   listUnits,
   updateUnit,
@@ -247,6 +248,52 @@ describe('unit repository', () => {
 
       const error = await updateUnit('missing', { name: 'X' }).catch((e: unknown) => e);
       expect(isRepoError(error, REPO_ERROR.NOT_FOUND)).toBe(true);
+    });
+  });
+
+  describe('ensureDefaultUnits', () => {
+    const gramRow = { ...unitRow, id: 'unit-g', name: 'Gramo', symbol: 'g', type: 'weight' };
+    const mlRow = { ...unitRow, id: 'unit-ml', name: 'Mililitro', symbol: 'ml', type: 'volume' };
+    const countRow = { ...unitRow, id: 'unit-count', name: 'Unidad', symbol: 'unit', type: 'count' };
+
+    it('seeds the three default units when none exist', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      // g / ml / unit existence checks all miss.
+      adapter.queueFirst('SELECT id FROM unit', null);
+      adapter.queueFirst('FROM unit WHERE id', gramRow); // g select-back
+      adapter.queueFirst('SELECT id FROM unit', null);
+      adapter.queueFirst('FROM unit WHERE id', mlRow); // ml select-back
+      adapter.queueFirst('SELECT id FROM unit', null);
+      adapter.queueFirst('FROM unit WHERE id', countRow); // unit select-back
+      adapter.queueAll('FROM unit', [gramRow, mlRow, countRow]); // final listUnits
+
+      const result = await ensureDefaultUnits();
+
+      const inserts = adapter.calls.filter((c) => c.sql.includes('INSERT INTO unit'));
+      expect(inserts).toHaveLength(3);
+      // params: [id, business_id, name, symbol, type, is_active, created_at, updated_at]
+      expect(inserts.map((c) => c.params[3])).toEqual(['g', 'ml', 'unit']);
+      expect(inserts.map((c) => c.params[4])).toEqual(['weight', 'volume', 'count']);
+      for (const ins of inserts) {
+        expect(ins.params[1]).toBe('biz-1');
+        expect(ins.params[5]).toBe(1); // is_active defaults true
+      }
+
+      expect(result).toHaveLength(3);
+      expect(result.map((u) => u.symbol)).toEqual(['g', 'ml', 'unit']);
+    });
+
+    it('is idempotent: existing defaults issue no INSERT', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('SELECT id FROM unit', { id: 'unit-g' });
+      adapter.queueFirst('SELECT id FROM unit', { id: 'unit-ml' });
+      adapter.queueFirst('SELECT id FROM unit', { id: 'unit-count' });
+      adapter.queueAll('FROM unit', [gramRow, mlRow, countRow]);
+
+      const result = await ensureDefaultUnits();
+
+      expect(adapter.calls.some((c) => c.sql.includes('INSERT INTO unit'))).toBe(false);
+      expect(result).toHaveLength(3);
     });
   });
 });

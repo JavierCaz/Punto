@@ -92,6 +92,27 @@ export default function MoreScreen() {
       </View>
 
       <View style={styles.section}>
+        <SectionHeader level="section" title={t('more.operations')} />
+        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+          <ListRow
+            icon="truck-outline"
+            title={t('more.suppliers')}
+            subtitle={t('more.suppliersSubtitle')}
+            onPress={() => router.push('/suppliers')}
+            divided
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+          />
+          <ListRow
+            icon="truck-delivery-outline"
+            title={t('more.purchases')}
+            subtitle={t('more.purchasesSubtitle')}
+            onPress={() => router.push('/purchases')}
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+          />
+        </ThemedView>
+      </View>
+
+      <View style={styles.section}>
         <SectionHeader level="section" title={t('settings.entry')} />
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
           <ListRow

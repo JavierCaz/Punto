@@ -330,8 +330,8 @@ describe('sale repository', () => {
       adapter.queueFirst('inventory_item_id FROM product', { inventory_item_id: null });
       adapter.queueFirst('FROM recipe', { id: 'rec-1' });
       adapter.queueAll('FROM recipe_item', [
-        { inventory_item_id: 'ing-1', quantity: 500 },
-        { inventory_item_id: 'ing-2', quantity: 250 },
+        { inventory_item_id: 'ing-1', quantity: 500, unit_cost_minor: 12 },
+        { inventory_item_id: 'ing-2', quantity: 250, unit_cost_minor: 10 },
       ]);
       adapter.queueFirst('FROM inventory_item', { id: 'ing-1', unit_id: 'ug', current_quantity: 10000 });
       adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
@@ -378,10 +378,12 @@ describe('sale repository', () => {
 
       const ing1 = movements.find((c) => c.params[2] === 'ing-1');
       expect(ing1!.params[4]).toBe(-1000); // round(500 * 2000 / 1000)
-      expect(ing1!.params[6]).toBe(30); // recipe line snapshot cost
+      expect(ing1!.params[6]).toBe(12); // ingredient cost: round(1000 * 12 / 1000)
 
       const ing2 = movements.find((c) => c.params[2] === 'ing-2');
       expect(ing2!.params[4]).toBe(-500); // round(250 * 2000 / 1000)
+      expect(ing2!.params[3]).toBe('SALE');
+      expect(ing2!.params[6]).toBe(5); // ingredient cost: round(500 * 10 / 1000)
       expect(ing2!.params[3]).toBe('SALE');
 
       // Status flipped with a completion stamp.
@@ -396,6 +398,83 @@ describe('sale repository', () => {
       expect(result.items).toHaveLength(2);
       expect(result.payments).toHaveLength(1);
       expect(result.totalMinor).toBe(1000);
+    });
+
+    it('deducts recipe ingredients for a matcha latte sale', async () => {
+      const matchaItem = {
+        ...SALE_ITEM_ROW,
+        id: 'si-matcha',
+        product_id: 'prod-matcha',
+        product_name: 'Matcha Latte',
+        quantity: 2000,
+        unit_price_minor: 500,
+        subtotal_minor: 1000,
+        unit_cost_minor: 400,
+      };
+
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('FROM sale', heldSale); // 1. load sale
+      adapter.queueAll('FROM sale_item', [matchaItem]); // 2. load items
+      adapter.queueFirst('type FROM payment_method', { type: 'CASH' }); // 3. payment method
+
+      // 3. consume stock — product has no direct bridge → recipe (two ingredients).
+      adapter.queueFirst('inventory_item_id FROM product', { inventory_item_id: null });
+      adapter.queueFirst('FROM recipe', { id: 'rec-matcha' });
+      adapter.queueAll('FROM recipe_item', [
+        { inventory_item_id: 'ing-matcha', quantity: 8000, unit_cost_minor: 50 },
+        { inventory_item_id: 'ing-milk', quantity: 200000, unit_cost_minor: 2 },
+      ]);
+      adapter.queueFirst('FROM inventory_item', { id: 'ing-matcha', unit_id: 'ug', current_quantity: 1000000 });
+      adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
+      adapter.queueFirst('FROM inventory_item', { id: 'ing-milk', unit_id: 'ug', current_quantity: 1000000 });
+      adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
+
+      // 4. select-back detail.
+      adapter.queueFirst('FROM sale', completedSale);
+      adapter.queueAll('FROM sale_item', [matchaItem]);
+      adapter.queueAll('FROM payment', [PAYMENT_ROW]);
+
+      const result = await completeSale({
+        saleId: 'sale-1',
+        payments: [{ paymentMethodId: 'pm-cash', amountMinor: 1000, amountGivenMinor: 1000 }],
+      });
+
+      // Exactly two SALE movements: matcha (-16000) + milk (-400000).
+      const movements = adapter.calls.filter((c) => c.sql.includes('INSERT INTO inventory_movement'));
+      expect(movements).toHaveLength(2);
+
+      const matcha = movements.find((c) => c.params[2] === 'ing-matcha');
+      expect(matcha).toBeDefined();
+      expect(matcha!.params[3]).toBe('SALE');
+      expect(matcha!.params[4]).toBe(-16000); // round(8000 * 2000 / 1000)
+      expect(matcha!.params[6]).toBe(800); // matcha cost: round(16000 * 50 / 1000)
+      expect(matcha!.params[9]).toBe('sale'); // reference_type
+      expect(matcha!.params[10]).toBe('sale-1'); // reference_id
+      expect(matcha!.params[11]).toBe('emp-1'); // employee_id from the sale
+
+      const milk = movements.find((c) => c.params[2] === 'ing-milk');
+      expect(milk).toBeDefined();
+      expect(milk!.params[3]).toBe('SALE');
+      expect(milk!.params[4]).toBe(-400000); // round(200000 * 2000 / 1000)
+      expect(milk!.params[6]).toBe(800); // milk cost: round(400000 * 2 / 1000)
+      expect(milk!.params[9]).toBe('sale');
+
+      // The matching current_quantity cache updates apply the same negative deltas.
+      const cacheUpdates = adapter.calls.filter(
+        (c) => c.sql.includes('UPDATE inventory_item') && c.sql.includes('current_quantity = current_quantity + ?'),
+      );
+      expect(cacheUpdates).toHaveLength(2);
+      const matchaUpdate = cacheUpdates.find((c) => c.params[2] === 'ing-matcha');
+      const milkUpdate = cacheUpdates.find((c) => c.params[2] === 'ing-milk');
+      expect(matchaUpdate).toBeDefined();
+      expect(matchaUpdate!.params[0]).toBe(-16000);
+      expect(milkUpdate).toBeDefined();
+      expect(milkUpdate!.params[0]).toBe(-400000);
+
+      expect(adapter.calls.some((c) => c.sql.includes("status = 'COMPLETED'"))).toBe(true);
+      expect(result.status).toBe('COMPLETED');
+      expect(result.items).toHaveLength(1);
+      expect(result.payments).toHaveLength(1);
     });
 
     it('accepts a CARD payment without amountGivenMinor', async () => {

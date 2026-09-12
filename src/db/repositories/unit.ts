@@ -275,3 +275,41 @@ async function updateUnitWithTxn(
   }
   return toUnit(mapUnitRow(row));
 }
+
+// ---------------------------------------------------------------------------
+// Default units (g / ml / unit)
+// ---------------------------------------------------------------------------
+
+/**
+ * The units every business starts with (AGENTS §3.1): grams, millilitres and
+ * a generic count unit. Symbols are the stable identity used by
+ * `ensureDefaultUnits` to stay idempotent.
+ */
+export const DEFAULT_UNITS: readonly CreateUnitInput[] = [
+  { name: 'Gramo', symbol: 'g', type: 'weight' },
+  { name: 'Mililitro', symbol: 'ml', type: 'volume' },
+  { name: 'Unidad', symbol: 'unit', type: 'count' },
+];
+
+/**
+ * Idempotently seed the default units for the current business. Safe to call
+ * on every list load / app start: a default is skipped when a unit with the
+ * same symbol already exists (including an inactive one, so we never resurrect
+ * a unit the owner hid). Returns the business's full unit list.
+ */
+export async function ensureDefaultUnits(): Promise<Unit[]> {
+  const businessId = await getBusinessId();
+  await withTransaction(async (txn) => {
+    for (const unit of DEFAULT_UNITS) {
+      const existing = await txn.getFirstAsync<{ id: string }>(
+        `SELECT id FROM unit WHERE business_id = ? AND symbol = ? LIMIT 1`,
+        businessId,
+        unit.symbol,
+      );
+      if (!existing) {
+        await createUnitWithTxn(txn, businessId, unit);
+      }
+    }
+  });
+  return listUnits({ includeInactive: true });
+}

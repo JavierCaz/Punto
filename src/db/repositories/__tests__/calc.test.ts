@@ -8,6 +8,9 @@
 import {
   assertSufficientStock,
   computeChangeMinor,
+  computeIngredientCostMinor,
+  computeRecipeConsumptionMilli,
+  computeRecipeCostMinor,
   computeTaxMinor,
   scaleQuantityByCount,
   sumMinor,
@@ -96,5 +99,56 @@ describe('assertSufficientStock', () => {
 
   it('allows negative results when the business opts in', () => {
     expect(() => assertSufficientStock(10, -20, true)).not.toThrow();
+  });
+});
+
+describe('computeRecipeConsumptionMilli', () => {
+  it('scales a per-portion recipe quantity by the sold line quantity', () => {
+    // 8 g per latte × 2 lattes = 16 g (8000 milli × 2000 milli / 1000).
+    expect(computeRecipeConsumptionMilli(8000, 2000)).toBe(16000);
+    // 8 g per latte × 1 latte = 8 g.
+    expect(computeRecipeConsumptionMilli(8000, 1000)).toBe(8000);
+    // 0.5 g per portion × 2 portions = 1 g.
+    expect(computeRecipeConsumptionMilli(500, 2000)).toBe(1000);
+  });
+
+  it('rounds the consumed milli-quantity to the nearest milli-unit', () => {
+    // 333 milli × 1.5 portions = 499.5 → 500.
+    expect(computeRecipeConsumptionMilli(333, 1500)).toBe(500);
+    // 333 milli × 1 portion = 333 (exact, no float drift).
+    expect(computeRecipeConsumptionMilli(333, 1000)).toBe(333);
+  });
+
+  it('returns 0 for a tiny quantity that rounds away', () => {
+    expect(computeRecipeConsumptionMilli(1, 1)).toBe(0); // 0.001 milli → 0
+    expect(computeRecipeConsumptionMilli(1, 499)).toBe(0); // 0.499 → 0
+  });
+});
+
+describe('computeIngredientCostMinor', () => {
+  it('scales a consumed milli-quantity by a per-unit cost', () => {
+    // 16000 milli (16 g) × 50 cents/unit = 800 cents.
+    expect(computeIngredientCostMinor(16000, 50)).toBe(800);
+    expect(computeIngredientCostMinor(0, 50)).toBe(0);
+  });
+
+  it('rounds the cost to the nearest minor unit', () => {
+    expect(computeIngredientCostMinor(333, 50)).toBe(17); // 16.65 → 17
+    expect(computeIngredientCostMinor(166, 50)).toBe(8); // 8.3 → 8
+  });
+});
+
+describe('computeRecipeCostMinor', () => {
+  it('sums each ingredient cost into a per-portion recipe cost', () => {
+    // matcha 8000 milli × 50 = 400; milk 200000 milli × 2 = 400 → 800.
+    const cost = computeRecipeCostMinor([
+      { quantityMilli: 8000, unitCostMinor: 50 },
+      { quantityMilli: 200000, unitCostMinor: 2 },
+    ]);
+    expect(cost).toBe(800);
+  });
+
+  it('returns 0 for an empty ingredient list', () => {
+    expect(computeRecipeCostMinor([])).toBe(0);
   });
 });
