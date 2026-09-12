@@ -34,6 +34,9 @@ jest.mock('@/lib/product-image', () => ({
   pickProductImage: jest.fn(),
   deleteProductImage: jest.fn(),
 }));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 
 const categories: Category[] = [
   {
@@ -133,6 +136,7 @@ describe('ProductForm', () => {
 
     await fireEvent.changeText(getByTestId('product-name'), 'Matcha Latte');
     await fireEvent.changeText(getByTestId('product-price'), '12.50');
+    await fireEvent.press(getByTestId('product-category-trigger'));
     await fireEvent.press(getByText('Bebidas'));
     await fireEvent.press(getByText('Guardar'));
 

@@ -4,11 +4,11 @@ import { StyleSheet, View } from 'react-native';
 
 import { AdvancedSection } from './advanced-section';
 import { FormField } from './form-field';
-import { OptionSelector } from './option-selector';
 import { PrimaryButton } from './primary-button';
 import { ProductImagePicker, type ProductImageError } from './product-image-picker';
 import { RecipeEditor } from './recipe-editor';
 import { SecondaryButton } from './secondary-button';
+import { SelectField } from './select-field';
 import { SwitchRow } from './switch-row';
 import { ThemedText } from './themed-text';
 
@@ -190,18 +190,14 @@ export function ProductForm({
         ) : null}
       </View>
 
-      <View style={styles.group}>
-        <ThemedText type="body2" themeColor="textSecondary">
-          {t('products.form.categoryLabel')}
-        </ThemedText>
-        <OptionSelector
-          items={categoryOptions}
-          value={categoryId}
-          onChange={setCategoryId}
-          noneLabel={t('products.form.categoryNone')}
-          testIDPrefix="product-category"
-        />
-      </View>
+      <SelectField
+        label={t('products.form.categoryLabel')}
+        items={categoryOptions}
+        value={categoryId}
+        onChange={setCategoryId}
+        noneLabel={t('products.form.categoryNone')}
+        testIDPrefix="product-category"
+      />
 
       <FormField
         label={t('products.form.priceLabel')}
@@ -248,39 +244,27 @@ export function ProductForm({
 
         {trackInventory ? (
           <>
-                <View style={styles.group}>
-                  <ThemedText type="body2" themeColor="textSecondary">
-                    {t('products.form.stockLabel')}
-                  </ThemedText>
-                  <ThemedText type="body2" themeColor="textSecondary">
-                    {t('products.form.stockHint')}
-                  </ThemedText>
-                  <OptionSelector
-                    items={inventoryOptions}
-                    value={inventoryItemId}
-                    onChange={setInventoryItemId}
-                    noneLabel={t('products.form.stockNone')}
-                    testIDPrefix="product-stock"
-                  />
-                </View>
+            <SelectField
+              label={t('products.form.stockLabel')}
+              hint={t('products.form.stockHint')}
+              items={inventoryOptions}
+              value={inventoryItemId}
+              onChange={setInventoryItemId}
+              noneLabel={t('products.form.stockNone')}
+              testIDPrefix="product-stock"
+            />
 
-                {inventoryItemId != null ? (
-                  <View style={styles.group}>
-                    <ThemedText type="body2" themeColor="textSecondary">
-                      {t('products.form.supplierLabel')}
-                    </ThemedText>
-                    <ThemedText type="body2" themeColor="textSecondary">
-                      {t('products.form.supplierHint')}
-                    </ThemedText>
-                    <OptionSelector
-                      items={supplierOptions}
-                      value={supplierId}
-                      onChange={setSupplierId}
-                      noneLabel={t('products.form.supplierNone')}
-                      testIDPrefix="product-supplier"
-                    />
-                  </View>
-                ) : null}
+            {inventoryItemId != null ? (
+              <SelectField
+                label={t('products.form.supplierLabel')}
+                hint={t('products.form.supplierHint')}
+                items={supplierOptions}
+                value={supplierId}
+                onChange={setSupplierId}
+                noneLabel={t('products.form.supplierNone')}
+                testIDPrefix="product-supplier"
+              />
+            ) : null}
 
             <RecipeEditor
               items={recipeItems}

@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { FormField } from './form-field';
-import { OptionSelector } from './option-selector';
 import { SecondaryButton } from './secondary-button';
+import { SelectField } from './select-field';
 import { ThemedText } from './themed-text';
 
 import { Radius, Spacing } from '@/constants/theme';
@@ -68,11 +68,12 @@ export function RecipeEditor({ items, inventoryItems, onChange, error }: RecipeE
         <View
           key={`recipe-line-${index}`}
           style={[styles.line, { borderColor: theme.border }]}>
-          <OptionSelector
+          <SelectField
             items={itemOptions}
             value={line.inventoryItemId}
             onChange={(value) => updateLine(index, { inventoryItemId: value })}
             noneLabel={t('products.form.stockNone')}
+            accessibilityLabel={t('products.form.recipeLabel')}
             testIDPrefix={`recipe-item-${index}`}
           />
           <FormField
