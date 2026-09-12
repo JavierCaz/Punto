@@ -33,7 +33,7 @@ export default function MoreScreen() {
   };
 
   return (
-    <Screen underWebTabBar>
+    <Screen scroll underWebTabBar>
       <SectionHeader title={t('tabs.more')} />
 
       {user ? (
@@ -86,6 +86,14 @@ export default function MoreScreen() {
             title={t('more.categories')}
             subtitle={t('categories.subtitle')}
             onPress={() => router.push('/categories')}
+            divided
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+          />
+          <ListRow
+            icon="package-variant-closed"
+            title={t('more.ingredients')}
+            subtitle={t('more.ingredientsSubtitle')}
+            onPress={() => router.push('/ingredients')}
             trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
           />
         </ThemedView>

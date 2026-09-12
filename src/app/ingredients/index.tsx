@@ -1,15 +1,15 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
 import { EmptyState } from '@/components/empty-state';
-import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 
 import { Radius, Spacing, TouchTarget } from '@/constants/theme';
 import { ensureDefaultUnits, listInventoryItems, listUnits, type InventoryItem, type Unit } from '@/db';
@@ -17,11 +17,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatQuantityMilli } from '@/lib/catalog-form';
 
 /**
- * Inventario — the ingredient list. Answers "what do I have and what is
- * running low?" (§5.2) with search, current stock per item and low/out-of-stock
- * badges. Tapping a row opens the create/edit screen.
+ * Ingredientes — management list under More → Catálogo. Answers "which
+ * ingredients exist and how much do I have?" with search and a `+` action that
+ * opens the create/edit screen. Operational stock actions live in the
+ * Inventario tab; this screen owns ingredient records.
  */
-export default function InventoryScreen() {
+export default function IngredientsScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
 
@@ -60,16 +61,35 @@ export default function InventoryScreen() {
   const unitSymbolFor = (unitId: string): string =>
     units.find((unit) => unit.id === unitId)?.symbol ?? '';
 
+  const renderAdd = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('ingredients.add')}
+      hitSlop={Spacing.two}
+      onPress={() => router.push('/ingredients/edit')}
+      style={({ pressed }) => [styles.headerAction, pressed && styles.headerActionPressed]}>
+      <MaterialCommunityIcons name="plus" size={24} color={theme.text} />
+    </Pressable>
+  );
+
   return (
-    <Screen underWebTabBar contentContainerStyle={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <ThemedText type="heading1">{t('inventory.title')}</ThemedText>
-          <ThemedText type="body2" themeColor="textSecondary">
-            {t('inventory.subtitle')}
-          </ThemedText>
-        </View>
-      </View>
+    <Screen scroll header contentContainerStyle={styles.content}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: t('ingredients.title'),
+          headerBackTitle: t('common.actions.back'),
+          headerStyle: { backgroundColor: theme.backgroundElement },
+          headerTintColor: theme.text,
+          headerTitleStyle: { color: theme.text },
+          headerShadowVisible: false,
+          headerRight: renderAdd,
+        }}
+      />
+
+      <ThemedText type="body2" themeColor="textSecondary">
+        {t('ingredients.subtitle')}
+      </ThemedText>
 
       {items.length > 0 ? (
         <CatalogFilterBar
@@ -78,8 +98,8 @@ export default function InventoryScreen() {
           categories={[]}
           selectedCategoryId={null}
           onCategoryChange={() => {}}
-          searchPlaceholder={t('inventory.searchPlaceholder')}
-          searchTestID="inventory-search"
+          searchPlaceholder={t('ingredients.searchPlaceholder')}
+          searchTestID="ingredients-search"
         />
       ) : null}
 
@@ -99,37 +119,29 @@ export default function InventoryScreen() {
         <View style={styles.state}>
           <EmptyState
             icon="package-variant-closed"
-            title={t('inventory.emptyTitle')}
-            message={t('inventory.emptyMessage')}
-            actionLabel={t('inventory.emptyAction')}
-            onActionPress={() => router.push('/ingredients')}
+            title={t('ingredients.emptyTitle')}
+            message={t('ingredients.emptyMessage')}
+            actionLabel={t('ingredients.emptyAction')}
+            onActionPress={() => router.push('/ingredients/edit')}
           />
         </View>
+      ) : visible.length === 0 ? (
+        <View style={styles.state}>
+          <ThemedText type="body2" themeColor="textSecondary">
+            {t('common.status.empty')}
+          </ThemedText>
+        </View>
       ) : (
-        <FlatList
-          data={visible}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          style={styles.list}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const unitSymbol = unitSymbolFor(item.unitId);
-            const outOfStock = item.currentQuantity <= 0;
-            const lowStock =
-              !outOfStock && item.minimumQuantity > 0 && item.currentQuantity <= item.minimumQuantity;
-            const badgeColor = outOfStock ? theme.danger : theme.warning;
-
-            return (
+        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+          {visible.map((item, index) => (
+            <View key={item.id}>
+              {index > 0 ? (
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
+              ) : null}
               <Pressable
                 accessibilityRole="button"
-                onPress={() =>
-                  router.push({ pathname: '/inventory/detail', params: { id: item.id } })
-                }
-                style={({ pressed }) => [
-                  styles.row,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  pressed && styles.pressed,
-                ]}>
+                onPress={() => router.push({ pathname: '/ingredients/edit', params: { id: item.id } })}
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
                 <MaterialCommunityIcons
                   name="package-variant-closed"
                   size={22}
@@ -140,82 +152,21 @@ export default function InventoryScreen() {
                     {item.name}
                   </ThemedText>
                   <ThemedText type="code" themeColor="textSecondary">
-                    {`${formatQuantityMilli(item.currentQuantity)} ${unitSymbol}`}
+                    {`${formatQuantityMilli(item.currentQuantity)} ${unitSymbolFor(item.unitId)}`}
                   </ThemedText>
                 </View>
-                {outOfStock || lowStock ? (
-                  <View style={[styles.badge, { borderColor: badgeColor }]}>
-                    <ThemedText type="micro" style={{ color: badgeColor }}>
-                      {outOfStock ? t('inventory.outOfStock') : t('inventory.lowStock')}
-                    </ThemedText>
-                  </View>
-                ) : null}
               </Pressable>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.state}>
-              <ThemedText type="body2" themeColor="textSecondary">
-                {t('common.status.empty')}
-              </ThemedText>
             </View>
-          }
-        />
+          ))}
+        </ThemedView>
       )}
-      <PrimaryButton
-        label={t('inventory.purchase')}
-        icon="cart-plus"
-        onPress={() => router.push('/purchases/edit')}
-      />
-
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
+  content: {
     gap: Spacing.three,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-  },
-  headerText: {
-    flex: 1,
-    gap: Spacing.one,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.five,
-  },
-  row: {
-    minHeight: TouchTarget.min,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  rowText: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  badge: {
-    borderRadius: Radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-  },
-  pressed: {
-    opacity: 0.7,
   },
   state: {
     flex: 1,
@@ -223,5 +174,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.three,
     paddingVertical: Spacing.five,
+  },
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: Spacing.three,
+  },
+  row: {
+    minHeight: TouchTarget.min,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  rowText: {
+    flex: 1,
+    gap: Spacing.half,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  headerAction: {
+    minWidth: TouchTarget.min,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionPressed: {
+    opacity: 0.6,
   },
 });
