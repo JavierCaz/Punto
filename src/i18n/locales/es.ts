@@ -275,6 +275,7 @@ export default {
       light: 'Claro',
       dark: 'Oscuro',
       system: 'Sistema',
+      darkMode: 'Modo oscuro',
     },
     languageOptions: {
       es: 'Español',

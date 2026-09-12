@@ -76,9 +76,8 @@ describe('SettingsScreen', () => {
 
     expect(getByText('Apariencia')).toBeTruthy();
     expect(getByText('Negocio')).toBeTruthy();
-    expect(getByText('Claro')).toBeTruthy();
-    expect(getByText('Oscuro')).toBeTruthy();
-    expect(getByText('Sistema')).toBeTruthy();
+    expect(getByText('Modo oscuro')).toBeTruthy();
+    expect(getByTestId('theme-dark-switch')).toBeTruthy();
 
     await waitFor(() => expect(getByDisplayValue('Café La Esquina')).toBeTruthy());
     expect(getByText('Color de acento')).toBeTruthy();
@@ -92,9 +91,7 @@ describe('SettingsScreen', () => {
 
     expect(getByText('Appearance')).toBeTruthy();
     expect(getByText('Business')).toBeTruthy();
-    expect(getByText('Light')).toBeTruthy();
-    expect(getByText('Dark')).toBeTruthy();
-    expect(getByText('System')).toBeTruthy();
+    expect(getByText('Dark mode')).toBeTruthy();
 
     await waitFor(() => expect(getByTestId('accent-option-royal')).toBeTruthy());
     expect(getByText('Accent color')).toBeTruthy();

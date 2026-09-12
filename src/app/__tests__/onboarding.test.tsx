@@ -95,7 +95,7 @@ describe('OnboardingScreen', () => {
     await fireEvent.press(getByTestId('business-logo-avatar'));
 
     // Currency — switch the device default (USD) to MXN.
-    await fireEvent.press(getByText('Peso mexicano (MXN)'));
+    await fireEvent(getByTestId('currency-switch'), 'valueChange', false);
 
     await fireEvent.press(getByText('Crear mi negocio'));
 
@@ -114,11 +114,11 @@ describe('OnboardingScreen', () => {
   });
 
   it('uses the selected language as the business locale', async () => {
-    const { getByText, getByPlaceholderText, getByLabelText } = await render(<OnboardingScreen />);
+    const { getByText, getByTestId, getByPlaceholderText, getByLabelText } = await render(<OnboardingScreen />);
 
     await fillAccountFields(getByPlaceholderText, getByLabelText);
 
-    await fireEvent.press(getByText('English'));
+    await fireEvent(getByTestId('language-switch'), 'valueChange', true);
     await waitFor(() => expect(i18n.language).toBe('en'));
 
     await fireEvent.press(getByText('Create my business'));

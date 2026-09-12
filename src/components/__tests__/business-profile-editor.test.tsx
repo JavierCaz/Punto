@@ -71,18 +71,18 @@ describe('BusinessProfileEditor', () => {
     const { getByDisplayValue, getByText } = await render(<BusinessProfileEditor />);
 
     await waitFor(() => expect(getByDisplayValue('Café La Esquina')).toBeTruthy());
+    expect(getByText('Moneda')).toBeTruthy();
     expect(getByText('Peso mexicano (MXN)')).toBeTruthy();
-    expect(getByText('Dólar estadounidense (USD)')).toBeTruthy();
   });
 
   it('saves the edited name and currency through updateBusinessProfile', async () => {
     mockGetBusinessProfile.mockResolvedValue(profile);
 
-    const { getByDisplayValue, getByText } = await render(<BusinessProfileEditor />);
+    const { getByDisplayValue, getByText, getByTestId } = await render(<BusinessProfileEditor />);
 
     const nameInput = await waitFor(() => getByDisplayValue('Café La Esquina'));
     await fireEvent.changeText(nameInput, 'Café Nuevo');
-    await fireEvent.press(getByText('Dólar estadounidense (USD)'));
+    await fireEvent(getByTestId('currency-switch'), 'valueChange', true);
     await fireEvent.press(getByText('Guardar cambios'));
 
     await waitFor(() =>

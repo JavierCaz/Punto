@@ -270,6 +270,7 @@ const en: typeof es = {
       light: 'Light',
       dark: 'Dark',
       system: 'System',
+      darkMode: 'Dark mode',
     },
     languageOptions: {
       es: 'Español',

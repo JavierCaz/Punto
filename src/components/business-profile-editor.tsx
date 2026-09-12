@@ -4,8 +4,8 @@ import { StyleSheet, TextInput, View } from 'react-native';
 
 import { AccentOptions } from './accent-options';
 import { BusinessLogoPicker, type BusinessLogoError } from './business-logo-picker';
-import { CurrencyOptions } from './currency-options';
-import { LanguageOptions } from './language-options';
+import { CurrencySwitch } from './currency-switch';
+import { LanguageSwitch } from './language-switch';
 import { PrimaryButton } from './primary-button';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -215,9 +215,8 @@ export function BusinessProfileEditor() {
       </View>
 
       <View style={styles.fieldGroup}>
-        <ThemedText type="body2">{t('business.currencyLabel')}</ThemedText>
         <ThemedView type="background" style={[styles.optionsBox, { borderColor: theme.border }]}>
-          <CurrencyOptions
+          <CurrencySwitch
             value={currency}
             onChange={(next) => {
               setCurrency(next);
@@ -228,9 +227,8 @@ export function BusinessProfileEditor() {
       </View>
 
       <View style={styles.fieldGroup}>
-        <ThemedText type="body2">{t('business.localeLabel')}</ThemedText>
         <ThemedView type="background" style={[styles.optionsBox, { borderColor: theme.border }]}>
-          <LanguageOptions
+          <LanguageSwitch
             value={locale}
             onChange={(next) => {
               setLocale(next);

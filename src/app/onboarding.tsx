@@ -11,8 +11,8 @@ import { StyleSheet, TextInput, View, type StyleProp, type TextStyle } from 'rea
 
 import { normalizeUsername, useAuthStore, validatePassword, validateUsername } from '@/auth';
 import { BusinessLogoPicker, type BusinessLogoError } from '@/components/business-logo-picker';
-import { CurrencyOptions } from '@/components/currency-options';
-import { LanguageOptions } from '@/components/language-options';
+import { CurrencySwitch } from '@/components/currency-switch';
+import { LanguageSwitch } from '@/components/language-switch';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
 import { SectionHeader } from '@/components/section-header';
@@ -201,20 +201,18 @@ export default function OnboardingScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <ThemedText type="body2">{t('business.currencyLabel')}</ThemedText>
               <ThemedView
                 type="background"
                 style={[styles.optionsBox, { borderColor: theme.border }]}>
-                <CurrencyOptions value={currency} onChange={setCurrency} />
+                <CurrencySwitch value={currency} onChange={setCurrency} />
               </ThemedView>
             </View>
 
             <View style={styles.fieldGroup}>
-              <ThemedText type="body2">{t('business.localeLabel')}</ThemedText>
               <ThemedView
                 type="background"
                 style={[styles.optionsBox, { borderColor: theme.border }]}>
-                <LanguageOptions />
+                <LanguageSwitch />
               </ThemedView>
             </View>
           </View>

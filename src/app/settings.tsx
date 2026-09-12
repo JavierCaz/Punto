@@ -7,7 +7,7 @@ import { Screen } from '@/components/screen';
 import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ThemeModeOptions } from '@/components/theme-options';
+import { ThemeSwitch } from '@/components/theme-switch';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -33,7 +33,7 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <SectionHeader level="section" title={t('settings.appearance')} />
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <ThemeModeOptions />
+          <ThemeSwitch />
         </ThemedView>
       </View>
 

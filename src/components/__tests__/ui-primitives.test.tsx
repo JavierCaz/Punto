@@ -1,6 +1,6 @@
 /**
  * Component tests for the shared UI primitives (EmptyState, buttons) and the
- * Settings theme rows (ThemeModeOptions), rendered via @testing-library/react-native.
+ * Settings theme switch (ThemeSwitch), rendered via @testing-library/react-native.
  *
  * Native modules are mocked: expo-localization (i18n init), expo-sqlite kv-store
  * (zustand stores) and the MaterialCommunityIcons font component.
@@ -14,7 +14,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { EmptyState } from '@/components/empty-state';
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
-import { ThemeModeOptions } from '@/components/theme-options';
+import { ThemeSwitch } from '@/components/theme-switch';
 import { i18n } from '@/i18n';
 import { useThemeStore } from '@/theme/theme-store';
 
@@ -80,34 +80,32 @@ describe('buttons', () => {
   });
 });
 
-describe('Settings theme rows', () => {
+describe('Settings theme switch', () => {
   beforeEach(() => {
     useThemeStore.setState({ mode: 'system', hasHydrated: false });
   });
 
-  it('renders the three theme options with Spanish labels', async () => {
-    const { getByText } = await render(<ThemeModeOptions />);
+  it('renders the dark-mode switch with Spanish copy', async () => {
+    const { getByText, getByTestId } = await render(<ThemeSwitch />);
 
-    expect(getByText('Claro')).toBeTruthy();
-    expect(getByText('Oscuro')).toBeTruthy();
-    expect(getByText('Sistema')).toBeTruthy();
+    expect(getByText('Modo oscuro')).toBeTruthy();
+    expect(getByTestId('theme-dark-switch')).toBeTruthy();
   });
 
-  it('selecting a row updates the persisted theme-mode store', async () => {
-    const { getByText } = await render(<ThemeModeOptions />);
+  it('toggling the switch persists an explicit theme mode', async () => {
+    const { getByTestId } = await render(<ThemeSwitch />);
 
-    await fireEvent.press(getByText('Oscuro'));
+    await fireEvent(getByTestId('theme-dark-switch'), 'valueChange', true);
     expect(useThemeStore.getState().mode).toBe('dark');
 
-    await fireEvent.press(getByText('Claro'));
+    await fireEvent(getByTestId('theme-dark-switch'), 'valueChange', false);
     expect(useThemeStore.getState().mode).toBe('light');
   });
 
-  it('renders an English label when the active language is en', async () => {
+  it('renders English copy when the active language is en', async () => {
     await i18n.changeLanguage('en');
-    const { getByText } = await render(<ThemeModeOptions />);
+    const { getByText } = await render(<ThemeSwitch />);
 
-    expect(getByText('Dark')).toBeTruthy();
-    expect(getByText('System')).toBeTruthy();
+    expect(getByText('Dark mode')).toBeTruthy();
   });
 });
