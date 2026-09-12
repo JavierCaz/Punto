@@ -239,7 +239,7 @@ async function createProductWithTxn(
   // path) so the invariant is enforced uniformly.
   if (input.inventoryItemId != null) {
     const recipe = await txn.getFirstAsync<{ id: string }>(
-      `SELECT id FROM recipe WHERE product_id = ? AND business_id = ? LIMIT 1`,
+      `SELECT id FROM recipe WHERE product_id = ? AND business_id = ? AND is_active = 1 LIMIT 1`,
       id,
       businessId,
     );
@@ -293,11 +293,11 @@ async function createProductWithTxn(
 /** Patch fields for updating a product (only provided keys are changed). */
 export interface UpdateProductInput {
   name?: string;
-  categoryId?: string;
-  description?: string;
-  imageUri?: string;
-  sku?: string;
-  barcode?: string;
+  categoryId?: string | null;
+  description?: string | null;
+  imageUri?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
   priceMinor?: MoneyMinor;
   /** Optional 1:1 direct-stock bridge. `null` clears it; `undefined` leaves it unchanged. */
   inventoryItemId?: string | null;
@@ -335,7 +335,7 @@ async function updateProductWithTxn(
   // this product already has a recipe.
   if (input.inventoryItemId != null) {
     const recipe = await txn.getFirstAsync<{ id: string }>(
-      `SELECT id FROM recipe WHERE product_id = ? AND business_id = ? LIMIT 1`,
+      `SELECT id FROM recipe WHERE product_id = ? AND business_id = ? AND is_active = 1 LIMIT 1`,
       id,
       businessId,
     );

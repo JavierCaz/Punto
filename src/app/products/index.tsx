@@ -1,7 +1,8 @@
-import { useFocusEffect } from 'expo-router';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
 import { EmptyState } from '@/components/empty-state';
@@ -10,20 +11,14 @@ import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 
-import { Spacing } from '@/constants/theme';
+import { Spacing, TouchTarget } from '@/constants/theme';
 import { useCatalog } from '@/hooks/use-catalog';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate } from '@/i18n/format';
 import { filterProducts } from '@/lib/catalog-form';
 
 const TABLET_BREAKPOINT = 768;
 
-/**
- * POS — the main screen. Answers "find a product" (§5.2) by rendering the
- * live catalog (search + category filter, list on mobile / grid on tablet).
- * Tapping a product to build a cart arrives with the checkout flow.
- */
-export default function PosScreen() {
+export default function ProductsScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const { width } = useWindowDimensions();
@@ -32,7 +27,6 @@ export default function PosScreen() {
   const { products, categories, recipeProductIds, currency, loading, loadFailed, reload } = useCatalog();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const today = formatDate(new Date().toISOString());
 
   useFocusEffect(
     useCallback(() => {
@@ -44,14 +38,31 @@ export default function PosScreen() {
   const resolveCategoryName = (categoryId: string | null): string | null =>
     categories.find((category) => category.id === categoryId)?.name ?? null;
 
+  const renderAdd = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('products.add')}
+      hitSlop={Spacing.two}
+      onPress={() => router.push('/products/edit')}
+      style={({ pressed }) => [styles.headerAction, pressed && styles.headerActionPressed]}>
+      <MaterialCommunityIcons name="plus" size={24} color={theme.text} />
+    </Pressable>
+  );
+
   return (
-    <Screen underWebTabBar contentContainerStyle={styles.screen}>
-      <View style={styles.header}>
-        <ThemedText type="heading1">{t('pos.title')}</ThemedText>
-        <ThemedText type="body2" themeColor="textSecondary">
-          {today}
-        </ThemedText>
-      </View>
+    <Screen header contentContainerStyle={styles.screen}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: t('products.title'),
+          headerBackTitle: t('common.actions.back'),
+          headerStyle: { backgroundColor: theme.backgroundElement },
+          headerTintColor: theme.text,
+          headerTitleStyle: { color: theme.text },
+          headerShadowVisible: false,
+          headerRight: renderAdd,
+        }}
+      />
 
       {products.length > 0 ? (
         <CatalogFilterBar
@@ -60,8 +71,8 @@ export default function PosScreen() {
           categories={categories}
           selectedCategoryId={categoryFilter}
           onCategoryChange={setCategoryFilter}
-          searchPlaceholder={t('pos.searchPlaceholder')}
-          searchTestID="pos-search"
+          searchPlaceholder={t('products.searchPlaceholder')}
+          searchTestID="product-search"
         />
       ) : null}
 
@@ -80,9 +91,11 @@ export default function PosScreen() {
       ) : products.length === 0 ? (
         <View style={styles.state}>
           <EmptyState
-            icon="shopping-outline"
-            title={t('pos.empty.title')}
-            message={t('pos.empty.message')}
+            icon="silverware-fork-knife"
+            title={t('products.emptyTitle')}
+            message={t('products.emptyMessage')}
+            actionLabel={t('products.emptyAction')}
+            onActionPress={() => router.push('/products/edit')}
           />
         </View>
       ) : (
@@ -102,6 +115,7 @@ export default function PosScreen() {
               currency={currency}
               hasRecipe={recipeProductIds.has(item.id)}
               variant={isTablet ? 'grid' : 'list'}
+              onPress={() => router.push({ pathname: '/products/edit', params: { id: item.id } })}
             />
           )}
           ListEmptyComponent={
@@ -122,9 +136,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.three,
   },
-  header: {
-    gap: Spacing.one,
-  },
   list: {
     flex: 1,
   },
@@ -141,5 +152,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.three,
     paddingVertical: Spacing.five,
+  },
+  headerAction: {
+    minWidth: TouchTarget.min,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionPressed: {
+    opacity: 0.6,
   },
 });

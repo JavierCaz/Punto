@@ -349,6 +349,52 @@ describe('product repository', () => {
     });
   });
 
+    it('clears nullable fields when null is provided', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('SELECT id FROM product', { id: 'p1' }); // existence check
+      adapter.queueFirst('FROM product', {
+        ...PRODUCT_ROW,
+        category_id: null,
+        description: null,
+        image_uri: null,
+        barcode: null,
+      });
+
+      await updateProduct('p1', {
+        categoryId: null,
+        description: null,
+        imageUri: null,
+        barcode: null,
+      });
+
+      const updateCall = adapter.calls.find((c) => c.sql.includes('UPDATE product SET'));
+      expect(updateCall).toBeDefined();
+      expect(updateCall!.sql).toContain('category_id = ?');
+      expect(updateCall!.sql).toContain('description = ?');
+      expect(updateCall!.sql).toContain('image_uri = ?');
+      expect(updateCall!.sql).toContain('barcode = ?');
+      const params = updateCall!.params;
+      expect(params[0]).toBeNull();
+      expect(params[1]).toBeNull();
+      expect(params[2]).toBeNull();
+      expect(params[3]).toBeNull();
+    });
+
+    it('filters the XOR recipe check to active recipes', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('SELECT id FROM product', { id: 'p1' });
+      adapter.queueFirst('SELECT id FROM recipe', null);
+      adapter.queueFirst('FROM product', { ...PRODUCT_ROW, inventory_item_id: 'inv-1' });
+
+      await updateProduct('p1', { inventoryItemId: 'inv-1' });
+
+      const recipeCall = adapter.calls.find((c) => c.sql.includes('SELECT id FROM recipe'));
+      expect(recipeCall).toBeDefined();
+      expect(recipeCall!.sql).toContain('is_active = 1');
+      const updateCall = adapter.calls.find((c) => c.sql.includes('UPDATE product SET'));
+      expect(updateCall!.params[0]).toBe('inv-1');
+    });
+
   describe('archiveProduct', () => {
     it('sets archived_at and updated_at on a live row', async () => {
       adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });

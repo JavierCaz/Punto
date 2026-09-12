@@ -173,7 +173,7 @@ export default function AddEmployeeScreen() {
   const confirmPinLabel = `${t('common.actions.confirm')} ${t('team.form.pinLabel')}`;
 
   return (
-    <Screen scroll contentContainerStyle={styles.content}>
+    <Screen scroll header contentContainerStyle={styles.content}>
       <Stack.Screen
         options={{
           headerShown: true,

@@ -144,7 +144,7 @@ export default function TeamScreen() {
   );
 
   return (
-    <Screen>
+    <Screen header>
       <Stack.Screen
         options={{
           headerShown: true,

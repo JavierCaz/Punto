@@ -71,6 +71,27 @@ export default function MoreScreen() {
       ) : null}
 
       <View style={styles.section}>
+        <SectionHeader level="section" title={t('more.catalog')} />
+        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+          <ListRow
+            icon="silverware-fork-knife"
+            title={t('more.products')}
+            subtitle={t('products.subtitle')}
+            onPress={() => router.push('/products')}
+            divided
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+          />
+          <ListRow
+            icon="tag-outline"
+            title={t('more.categories')}
+            subtitle={t('categories.subtitle')}
+            onPress={() => router.push('/categories')}
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+          />
+        </ThemedView>
+      </View>
+
+      <View style={styles.section}>
         <SectionHeader level="section" title={t('settings.entry')} />
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
           <ListRow

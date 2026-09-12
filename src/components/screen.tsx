@@ -19,6 +19,8 @@ export type ScreenProps = {
   scroll?: boolean;
   /** Reserve top clearance for the floating web tab bar (tab screens only). */
   underWebTabBar?: boolean;
+  /** Set when a native stack header is shown, so the top inset is not applied twice. */
+  header?: boolean;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
 };
@@ -32,13 +34,18 @@ export function Screen({
   children,
   scroll = false,
   underWebTabBar = false,
+  header = false,
   style,
   contentContainerStyle,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
 
   const topPad =
-    Platform.OS === 'web' && underWebTabBar ? WEB_TAB_BAR_CLEARANCE : insets.top;
+    Platform.OS === 'web' && underWebTabBar
+      ? WEB_TAB_BAR_CLEARANCE
+      : header
+        ? 0
+        : insets.top;
 
   const contentStyle = [
     styles.content,

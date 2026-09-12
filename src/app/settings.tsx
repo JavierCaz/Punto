@@ -17,7 +17,7 @@ export default function SettingsScreen() {
   const theme = useTheme();
 
   return (
-    <Screen scroll contentContainerStyle={styles.content}>
+    <Screen scroll header contentContainerStyle={styles.content}>
       <Stack.Screen
         options={{
           headerShown: true,

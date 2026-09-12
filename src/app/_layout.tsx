@@ -136,6 +136,8 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="settings" />
               <Stack.Screen name="team" />
+              <Stack.Screen name="products" />
+              <Stack.Screen name="categories" />
             </Stack.Protected>
           </Stack>
         ) : null}
