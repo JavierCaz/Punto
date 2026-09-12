@@ -59,7 +59,7 @@ export function TabButton({
 }: TabTriggerSlotProps & { icon: TabIconName }) {
   const theme = useTheme();
 
-  const tint = isFocused ? theme.primary : theme.textSecondary;
+  const tint = isFocused ? theme.text : theme.textSecondary;
 
   return (
     <Pressable {...props} style={({ pressed }) => [styles.tabPressable, pressed && styles.pressed]}>
@@ -72,8 +72,7 @@ export function TabButton({
         <MaterialCommunityIcons name={icon} size={18} color={tint} />
         <ThemedText
           type="smallBold"
-          themeColor={isFocused ? 'text' : 'textSecondary'}
-          style={isFocused ? { color: theme.primary } : undefined}>
+          themeColor={isFocused ? 'text' : 'textSecondary'}>
           {children}
         </ThemedText>
       </ThemedView>

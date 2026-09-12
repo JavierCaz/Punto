@@ -103,6 +103,8 @@ export async function getBusiness(): Promise<BusinessRow | null> {
  */
 export async function onboardBusiness(input: {
   businessName: string;
+  /** Durable logo URI (already copied into app storage), or null/absent. */
+  logoUri?: string | null;
   currencyCode: string;
   locale: string;
   adminFirstName: string;
@@ -124,10 +126,11 @@ export async function onboardBusiness(input: {
     }
 
     await txn.runAsync(
-      `INSERT INTO business (id, name, currency_code, locale, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO business (id, name, logo_uri, currency_code, locale, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       businessId,
       input.businessName.trim(),
+      input.logoUri?.trim() || null,
       input.currencyCode,
       input.locale,
       timestamp,

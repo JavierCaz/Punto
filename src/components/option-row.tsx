@@ -25,6 +25,8 @@ export function OptionRow({ label, selected, onPress, icon, divided, testID }: O
       onPress={onPress}
       divided={divided}
       testID={testID}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       trailing={
         selected ? <MaterialCommunityIcons name="check" size={22} color={theme.primary} /> : null
       }

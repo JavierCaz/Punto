@@ -36,7 +36,15 @@
       "expo-sqlite",
       "expo-localization",
       "@react-native-community/datetimepicker",
-      "react-native-quick-crypto"
+      "react-native-quick-crypto",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Punto needs access to your photos so you can choose your business logo. / Punto necesita acceso a tus fotos para elegir el logo de tu negocio.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

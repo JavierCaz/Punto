@@ -8,14 +8,20 @@
  *  - §7.3 typography scale (display … micro) and native font families
  *  - §7.4 spacing grid, border radii and touch-target constants
  *
- * Backwards-compatible exports keep older consumers working:
- * `Colors`/`ThemeColor` map the legacy keys (text/background/
- * backgroundElement/backgroundSelected/textSecondary) onto the semantic
- * scale, and `Fonts`, `Spacing`, `BottomTabInset`, `MaxContentWidth` keep
- * their previous shape.
+ * `ThemeColor` maps the legacy view keys (text/background/backgroundElement/
+ * backgroundSelected/textSecondary) onto the semantic scale, and `Fonts`,
+ * `Spacing`, `BottomTabInset`, `MaxContentWidth` keep their previous shape.
+ *
+ * §7.2 accent safety: a user-selectable accent only recolors `primary` and
+ * `backgroundSelected`. `onPrimary` is derived from the active accent with the
+ * WCAG contrast helper so button/icon foregrounds stay readable; the full
+ * accent × scheme matrix is enforced by theme.test.ts.
  */
 
 import { Platform } from 'react-native';
+
+import { ACCENTS, DEFAULT_ACCENT, type Accent } from '@/constants/accents';
+import { pickReadableForeground } from '@/lib/contrast';
 
 /** System color schemes the app can render in. */
 export type ColorScheme = 'light' | 'dark';
@@ -82,12 +88,13 @@ export const palette = {
 
 /**
  * §7.2 brand accents. Each accent recolors `color-primary-500` / `color-primary-100`
- * for both modes; every other semantic color stays fixed. Non-royal accents are
+ * for both modes; every other semantic color stays fixed. Accents are
  * business-profile choices persisted with the profile (never hard-coded in UI).
+ * The vocabulary lives in `@/constants/accents` so the DB CHECK constraint and
+ * the palette keys cannot drift apart.
  */
-export type Accent = 'royal' | 'emerald' | 'indigo' | 'amber' | 'slate' | 'rose';
-
-export const DEFAULT_ACCENT: Accent = 'royal';
+export { ACCENTS, DEFAULT_ACCENT };
+export type { Accent };
 
 export interface AccentPalette {
   primary500: string;
@@ -144,6 +151,7 @@ export type ThemeColor =
   | 'backgroundSelected'
   | 'border'
   | 'primary'
+  | 'onPrimary'
   | 'success'
   | 'warning'
   | 'danger';
@@ -152,7 +160,8 @@ export type SemanticPalette = Record<ThemeColor, string>;
 
 /**
  * Build the semantic palette for a scheme from the raw §7.1 scale, applying
- * the optional §7.2 accent to `primary` / `backgroundSelected`.
+ * the optional §7.2 accent to `primary` / `backgroundSelected` and deriving an
+ * accessible `onPrimary` foreground for the accent.
  *
  * Legacy view names map onto the semantic scale as:
  *   text → neutral-900, textSecondary → neutral-600,
@@ -171,6 +180,8 @@ export function buildPalette(scheme: ColorScheme, accent: Accent = DEFAULT_ACCEN
     backgroundSelected: accentPair.primary100,
     border: raw.neutral200,
     primary: accentPair.primary500,
+    // Derived per accent so text/icons on primary always stay readable.
+    onPrimary: pickReadableForeground(accentPair.primary500),
     success: raw.success500,
     warning: raw.warning500,
     danger: raw.danger500,
@@ -178,16 +189,11 @@ export function buildPalette(scheme: ColorScheme, accent: Accent = DEFAULT_ACCEN
 }
 
 /**
- * Backwards-compatible light/dark objects. Previous consumers read
- * `Colors[scheme].background` / `.text` / `.backgroundElement` /
- * `.backgroundSelected` / `.textSecondary`; those keys still exist.
+ * Resolve the semantic palette for an active scheme + §7.2 accent. This is the
+ * single runtime entry point; there is intentionally no static `Colors` map,
+ * because a module-level palette pinned to the default accent would silently
+ * fail to recolor when the business picks another accent.
  */
-export const Colors: Record<ColorScheme, SemanticPalette> = {
-  light: buildPalette('light'),
-  dark: buildPalette('dark'),
-};
-
-/** Resolve the semantic palette for an active scheme (default brand accent). */
 export function resolvePalette(scheme: ColorScheme, accent: Accent = DEFAULT_ACCENT): SemanticPalette {
   return buildPalette(scheme, accent);
 }

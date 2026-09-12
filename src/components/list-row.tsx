@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type AccessibilityRole, type AccessibilityState } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import type { MaterialIconName } from './empty-state';
@@ -19,6 +19,9 @@ export type ListRowProps = {
   /** Render a hairline separator below this row. */
   divided?: boolean;
   testID?: string;
+  /** Accessibility overrides for the pressable row (defaults to a button). */
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
 };
 
 /**
@@ -34,6 +37,8 @@ export function ListRow({
   disabled = false,
   divided = false,
   testID,
+  accessibilityRole = 'button',
+  accessibilityState,
 }: ListRowProps) {
   const theme = useTheme();
 
@@ -67,7 +72,8 @@ export function ListRow({
     <View testID={testID}>
       {onPress ? (
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={accessibilityRole}
+          accessibilityState={accessibilityState}
           disabled={disabled}
           onPress={onPress}
           style={({ pressed }) => [styles.pressable, pressed && !disabled && { backgroundColor: theme.background }]}>

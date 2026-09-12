@@ -11,10 +11,12 @@ import '@/global.css';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/auth';
+import { getBusinessProfile } from '@/db';
 import { useDbBootstrap } from '@/hooks/use-db-bootstrap';
 import { useEffectiveColorScheme, useTheme } from '@/hooks/use-theme';
 import { i18n, setLanguage } from '@/i18n'; // also initialises i18n + dayjs locale
 import { useLanguageStore } from '@/i18n/language-store';
+import { useAccentStore } from '@/theme/accent-store';
 import { useThemeStore } from '@/theme/theme-store';
 
 SplashScreen.preventAutoHideAsync();
@@ -38,6 +40,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const { status, error } = useDbBootstrap();
   const hasThemeHydrated = useThemeStore((state) => state.hasHydrated);
+  const hasAccentHydrated = useAccentStore((state) => state.hasHydrated);
   const authPhase = useAuthStore((state) => state.phase);
   const authHydrated = useAuthStore((state) => state.hasHydrated);
   const [hasLanguageHydrated, setHasLanguageHydrated] = useState(false);
@@ -52,6 +55,7 @@ export default function RootLayout() {
     async function hydrateStores() {
       await Promise.all([
         useThemeStore.getState().hydrate(),
+        useAccentStore.getState().hydrate(getBusinessProfile),
         useLanguageStore.getState().hydrate(),
         useAuthStore.getState().hydrate(),
       ]);
@@ -103,7 +107,11 @@ export default function RootLayout() {
   // Content is gated on every store having hydrated so persisted overrides and
   // the auth phase never flash against defaults while resolving.
   const canRender =
-    status === 'ready' && authHydrated && hasThemeHydrated && hasLanguageHydrated;
+    status === 'ready' &&
+    authHydrated &&
+    hasThemeHydrated &&
+    hasAccentHydrated &&
+    hasLanguageHydrated;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>

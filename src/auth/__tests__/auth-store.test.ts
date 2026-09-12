@@ -190,6 +190,7 @@ describe('auth store onboarding', () => {
 
     const result = await useAuthStore.getState().completeOnboarding({
       businessName: 'Café La Esquina',
+      logoUri: 'file:///doc/logos/logo-1.png',
       currencyCode: 'USD',
       locale: 'es',
       adminFirstName: 'Ana',
@@ -200,6 +201,7 @@ describe('auth store onboarding', () => {
     expect(result).toEqual({ ok: true, user: admin });
     expect(mockRepo.onboardBusiness).toHaveBeenCalledWith({
       businessName: 'Café La Esquina',
+      logoUri: 'file:///doc/logos/logo-1.png',
       currencyCode: 'USD',
       locale: 'es',
       adminFirstName: 'Ana',

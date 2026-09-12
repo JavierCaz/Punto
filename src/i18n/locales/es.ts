@@ -35,6 +35,41 @@ export default {
     },
   },
 
+  currencies: {
+    MXN: 'Peso mexicano (MXN)',
+    USD: 'Dólar estadounidense (USD)',
+  },
+
+  accents: {
+    royal: 'Azul',
+    emerald: 'Esmeralda',
+    indigo: 'Índigo',
+    amber: 'Ámbar',
+    slate: 'Pizarra',
+    rose: 'Rosa',
+  },
+
+  business: {
+    nameLabel: 'Nombre del negocio',
+    namePlaceholder: 'Ej. Café La Esquina',
+    nameRequired: 'Escribe el nombre del negocio.',
+    logoLabel: 'Logo',
+    logoHint: 'Opcional. Aparecerá en tu punto de venta y en tus recibos.',
+    logoAdd: 'Agregar logo',
+    logoChange: 'Cambiar logo',
+    logoRemove: 'Quitar',
+    logoPermissionDenied: 'Necesitamos permiso para acceder a tus fotos.',
+    logoFailed: 'No pudimos cargar la imagen. Inténtalo de nuevo.',
+    accentLabel: 'Color de acento',
+    currencyLabel: 'Moneda',
+    localeLabel: 'Idioma',
+    loading: 'Cargando…',
+    save: 'Guardar cambios',
+    savePending: 'Guardando…',
+    saved: 'Cambios guardados',
+    saveFailed: 'No pudimos guardar los cambios. Inténtalo de nuevo.',
+  },
+
   tabs: {
     pos: 'POS',
     sales: 'Ventas',
@@ -87,14 +122,11 @@ export default {
       dark: 'Oscuro',
       system: 'Sistema',
     },
-    language: 'Idioma',
     languageOptions: {
       es: 'Español',
       en: 'English',
     },
     business: 'Negocio',
-    businessComingSoon:
-      'Pronto podrás configurar aquí tu negocio: nombre, logo, moneda y más. Todo se guarda solo en este dispositivo.',
     aboutLine: 'Hecho para negocios locales · Tus datos viven solo en este dispositivo.',
   },
 
@@ -118,7 +150,6 @@ export default {
     passwordLabel: 'Contraseña',
     passwordPlaceholder: 'Mínimo 8 caracteres',
     confirmPasswordLabel: 'Repite la contraseña',
-    currencyNotice: 'Moneda: {{currency}} · Idioma: {{language}} · Podrás ajustarlos después en Configuración',
     submit: 'Crear mi negocio',
     submitPending: 'Creando…',
     errors: {

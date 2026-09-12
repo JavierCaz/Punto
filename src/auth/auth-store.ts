@@ -56,6 +56,8 @@ interface AuthStoreState {
   signIn: (username: string, secret: string) => Promise<SignInOutcome>;
   completeOnboarding: (input: {
     businessName: string;
+    /** Durable logo URI from the onboarding picker, or null/absent. */
+    logoUri?: string | null;
     currencyCode: string;
     locale: string;
     adminFirstName: string;
@@ -111,6 +113,7 @@ export const useAuthStore = create<AuthStoreState>()((set, get) => ({
     try {
       const { employeeId } = await onboardBusiness({
         businessName: input.businessName,
+        logoUri: input.logoUri,
         currencyCode: input.currencyCode,
         locale: input.locale,
         adminFirstName: input.adminFirstName,

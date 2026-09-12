@@ -10,17 +10,22 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { normalizeUsername, useAuthStore, validatePassword, validateUsername } from '@/auth';
+import { BusinessLogoPicker, type BusinessLogoError } from '@/components/business-logo-picker';
+import { CurrencyOptions } from '@/components/currency-options';
+import { LanguageOptions } from '@/components/language-options';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
 import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { resolveDefaultCurrency, type CurrencyCode } from '@/constants/currencies';
 import { Radius, Spacing, TouchTarget, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { i18n } from '@/i18n';
+import { i18n, resolveLanguage } from '@/i18n';
+import { deleteBusinessLogo } from '@/lib/business-logo';
 
-/** Device currency drives the business default; surfaced before submit. */
-const DEVICE_CURRENCY = getLocales()[0]?.currencyCode ?? 'USD';
+/** Device currency seeds the initial selection when it is one of ours. */
+const INITIAL_CURRENCY = resolveDefaultCurrency(getLocales()[0]?.currencyCode);
 
 type ErrorField =
   | 'businessName'
@@ -49,15 +54,15 @@ export default function OnboardingScreen() {
   const theme = useTheme();
 
   const [businessName, setBusinessName] = useState('');
+  const [logoUri, setLogoUri] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<BusinessLogoError | null>(null);
+  const [currency, setCurrency] = useState<CurrencyCode>(INITIAL_CURRENCY);
   const [firstName, setFirstName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<OnboardingError | null>(null);
-
-  const languageName =
-    i18n.language === 'en' ? t('settings.languageOptions.en') : t('settings.languageOptions.es');
 
   function clearErrorsFor(fields: readonly ErrorField[]): void {
     setError((current) => (current && fields.includes(current.field) ? null : current));
@@ -114,8 +119,9 @@ export default function OnboardingScreen() {
 
     const outcome = await useAuthStore.getState().completeOnboarding({
       businessName: businessName.trim(),
-      currencyCode: DEVICE_CURRENCY,
-      locale: i18n.language,
+      logoUri,
+      currencyCode: currency,
+      locale: resolveLanguage(i18n.language),
       adminFirstName: firstName.trim(),
       username: normalizeUsername(username),
       password,
@@ -150,6 +156,31 @@ export default function OnboardingScreen() {
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
           <View style={styles.cardBody}>
             <View style={styles.fieldGroup}>
+              <BusinessLogoPicker
+                logoUri={logoUri}
+                onChange={(uri) => {
+                  // Onboarding logo files are session-local (not persisted yet),
+                  // so a superseded pick can be removed immediately.
+                  if (logoUri && logoUri !== uri) {
+                    deleteBusinessLogo(logoUri);
+                  }
+                  setLogoUri(uri);
+                  setLogoError(null);
+                }}
+                onError={setLogoError}
+              />
+              {logoError ? (
+                <ThemedText type="body2" themeColor="danger">
+                  {t(
+                    logoError === 'permission-denied'
+                      ? 'business.logoPermissionDenied'
+                      : 'business.logoFailed',
+                  )}
+                </ThemedText>
+              ) : null}
+            </View>
+
+            <View style={styles.fieldGroup}>
               <ThemedText type="body2">{t('onboarding.businessNameLabel')}</ThemedText>
               <TextInput
                 value={businessName}
@@ -169,18 +200,22 @@ export default function OnboardingScreen() {
               </ThemedText>
             </View>
 
-            <View style={[styles.noticeRow, { borderTopColor: theme.border }]}>
-              <MaterialCommunityIcons
-                name="information-outline"
-                size={16}
-                color={theme.textSecondary}
-              />
-              <ThemedText type="body2" themeColor="textSecondary" style={styles.noticeText}>
-                {t('onboarding.currencyNotice', {
-                  currency: DEVICE_CURRENCY,
-                  language: languageName,
-                })}
-              </ThemedText>
+            <View style={styles.fieldGroup}>
+              <ThemedText type="body2">{t('business.currencyLabel')}</ThemedText>
+              <ThemedView
+                type="background"
+                style={[styles.optionsBox, { borderColor: theme.border }]}>
+                <CurrencyOptions value={currency} onChange={setCurrency} />
+              </ThemedView>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <ThemedText type="body2">{t('business.localeLabel')}</ThemedText>
+              <ThemedView
+                type="background"
+                style={[styles.optionsBox, { borderColor: theme.border }]}>
+                <LanguageOptions />
+              </ThemedView>
             </View>
           </View>
         </ThemedView>
@@ -338,15 +373,10 @@ const styles = StyleSheet.create({
     fontSize: Typography.body1.fontSize,
     lineHeight: Typography.body1.lineHeight,
   },
-  noticeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
-    paddingTop: Spacing.one,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  noticeText: {
-    flex: 1,
+  optionsBox: {
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
   roleBadge: {
     flexDirection: 'row',

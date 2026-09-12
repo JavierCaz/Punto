@@ -30,6 +30,41 @@ const en: typeof es = {
     },
   },
 
+  currencies: {
+    MXN: 'Mexican peso (MXN)',
+    USD: 'US dollar (USD)',
+  },
+
+  accents: {
+    royal: 'Royal blue',
+    emerald: 'Emerald',
+    indigo: 'Indigo',
+    amber: 'Amber',
+    slate: 'Slate',
+    rose: 'Rose',
+  },
+
+  business: {
+    nameLabel: 'Business name',
+    namePlaceholder: 'e.g. Corner Café',
+    nameRequired: 'Enter your business name.',
+    logoLabel: 'Logo',
+    logoHint: 'Optional. It will appear in your point of sale and receipts.',
+    logoAdd: 'Add logo',
+    logoChange: 'Change logo',
+    logoRemove: 'Remove',
+    logoPermissionDenied: 'We need permission to access your photos.',
+    logoFailed: "We couldn't load the image. Try again.",
+    accentLabel: 'Accent color',
+    currencyLabel: 'Currency',
+    localeLabel: 'Language',
+    loading: 'Loading…',
+    save: 'Save changes',
+    savePending: 'Saving…',
+    saved: 'Changes saved',
+    saveFailed: "We couldn't save your changes. Try again.",
+  },
+
   tabs: {
     pos: 'POS',
     sales: 'Sales',
@@ -82,14 +117,11 @@ const en: typeof es = {
       dark: 'Dark',
       system: 'System',
     },
-    language: 'Language',
     languageOptions: {
       es: 'Español',
       en: 'English',
     },
     business: 'Business',
-    businessComingSoon:
-      'Soon you will be able to set up your business here: name, logo, currency and more. Everything stays on this device only.',
     aboutLine: 'Made for local businesses · Your data lives only on this device.',
   },
 
@@ -113,7 +145,6 @@ const en: typeof es = {
     passwordLabel: 'Password',
     passwordPlaceholder: 'At least 8 characters',
     confirmPasswordLabel: 'Repeat password',
-    currencyNotice: 'Currency: {{currency}} · Language: {{language}} · Adjustable later in Settings',
     submit: 'Create my business',
     submitPending: 'Creating…',
     errors: {

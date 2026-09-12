@@ -3,13 +3,15 @@
  *
  * `useTheme()` returns the active semantic palette (the resolved scheme after
  * applying the user's stored override, falling back to the OS scheme for
- * 'system'). Components read semantic keys only — `theme.background`,
- * `theme.text`, `theme.backgroundElement`, `theme.backgroundSelected`,
- * `theme.textSecondary`, `theme.border`, `theme.primary`, …
+ * 'system', combined with the business accent). Components read semantic keys
+ * only — `theme.background`, `theme.text`, `theme.backgroundElement`,
+ * `theme.backgroundSelected`, `theme.textSecondary`, `theme.border`,
+ * `theme.primary`, `theme.onPrimary`, …
  */
 
-import { Colors, type ColorScheme, type SemanticPalette } from '@/constants/theme';
+import { type ColorScheme, type SemanticPalette, resolvePalette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAccentStore } from '@/theme/accent-store';
 import { resolveEffectiveScheme, useThemeStore } from '@/theme/theme-store';
 
 /**
@@ -23,7 +25,9 @@ export function useEffectiveColorScheme(): ColorScheme {
   return resolveEffectiveScheme(mode, systemScheme);
 }
 
-/** Semantic palette (§7.1 + accent) for the currently active scheme. */
+/** Semantic palette (§7.1 + §7.2 accent) for the active scheme. */
 export function useTheme(): SemanticPalette {
-  return Colors[useEffectiveColorScheme()];
+  const scheme = useEffectiveColorScheme();
+  const accent = useAccentStore((state) => state.accent);
+  return resolvePalette(scheme, accent);
 }

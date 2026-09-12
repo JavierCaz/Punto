@@ -1,3 +1,4 @@
+import { ACCENTS, isAccent, type Accent } from '@/constants/accents';
 import { getDb } from '@/db/client';
 
 import { nowIso } from '@/db/repositories/clock';
@@ -26,21 +27,22 @@ import { withTransaction } from '@/db/repositories/transaction';
 
 // ---------------------------------------------------------------------------
 // Locale / accent vocabulary (the exact strings of the migration 001 CHECK
-// constraints). Defined here — not in types.ts — because they are only
-// meaningful to the business profile.
+// constraints). Accent values are shared with the design tokens so the CHECK
+// constraint and the palette keys cannot drift apart.
 // ---------------------------------------------------------------------------
 export const LOCALE_CODES = ['es', 'en'] as const;
 export type LocaleCode = (typeof LOCALE_CODES)[number];
 
-export const ACCENT_COLORS = ['royal', 'emerald', 'indigo', 'amber', 'slate', 'rose'] as const;
-export type AccentColor = (typeof ACCENT_COLORS)[number];
+/** Alias of the canonical accent list (`@/constants/accents`). */
+export const ACCENT_COLORS = ACCENTS;
+export type AccentColor = Accent;
 
 export function isLocaleCode(value: unknown): value is LocaleCode {
   return typeof value === 'string' && (LOCALE_CODES as readonly string[]).includes(value);
 }
 
 export function isAccentColor(value: unknown): value is AccentColor {
-  return typeof value === 'string' && (ACCENT_COLORS as readonly string[]).includes(value);
+  return isAccent(value);
 }
 
 // ---------------------------------------------------------------------------

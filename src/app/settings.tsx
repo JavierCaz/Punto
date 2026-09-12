@@ -1,9 +1,8 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
-import { LanguageOptions } from '@/components/language-options';
+import { BusinessProfileEditor } from '@/components/business-profile-editor';
 import { Screen } from '@/components/screen';
 import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
@@ -39,21 +38,9 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader level="section" title={t('settings.language')} />
-        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <LanguageOptions />
-        </ThemedView>
-      </View>
-
-      <View style={styles.section}>
         <SectionHeader level="section" title={t('settings.business')} />
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <View style={styles.noteRow}>
-            <MaterialCommunityIcons name="storefront-outline" size={20} color={theme.textSecondary} />
-            <ThemedText type="body2" themeColor="textSecondary" style={styles.noteText}>
-              {t('settings.businessComingSoon')}
-            </ThemedText>
-          </View>
+          <BusinessProfileEditor />
         </ThemedView>
       </View>
 
@@ -77,15 +64,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-  },
-  noteRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.three,
-    padding: Spacing.three,
-  },
-  noteText: {
-    flex: 1,
   },
   footer: {
     alignItems: 'center',
