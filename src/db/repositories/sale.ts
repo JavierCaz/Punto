@@ -5,6 +5,7 @@ import { getBusinessId } from '@/db/repositories/business-scope';
 import {
   computeChangeMinor,
   computeIngredientCostMinor,
+  computeLineSubtotalMinor,
   computeRecipeConsumptionMilli,
   sumMinor,
 } from '@/db/repositories/calc';
@@ -261,19 +262,6 @@ export interface SaleFilter extends PageQuery {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Line subtotal in integer minor units: the per-display-unit price scaled by
- * the milli-quantity, rounded, then reduced by any line discount. Integer-only
- * (AGENTS §6 — no float money math).
- */
-function computeItemSubtotalMinor(
-  quantity: QuantityMilli,
-  unitPriceMinor: MoneyMinor,
-  discountMinor: MoneyMinor,
-): number {
-  return Math.round((quantity * unitPriceMinor) / 1000) - discountMinor;
-}
-
 /** Guard a sale lifecycle transition: throw `REPO_INVALID_STATE` unless it matches. */
 function assertStatus(actual: unknown, expected: SaleStatus): void {
   if (actual !== expected) {
@@ -301,7 +289,7 @@ async function insertSaleItemWithTxn(
     throw repoError(REPO_ERROR.INVALID_STATE, 'sale item quantity must be > 0');
   }
   const discountMinor = item.discountMinor ?? 0;
-  const subtotal = computeItemSubtotalMinor(item.quantity, item.unitPriceMinor, discountMinor);
+  const subtotal = computeLineSubtotalMinor(item.quantity, item.unitPriceMinor, discountMinor);
 
   try {
     await txn.runAsync(
@@ -656,7 +644,7 @@ async function updateSaleItemQuantityWithTxn(
   }
   assertStatus(sale.status, 'HELD');
 
-  const subtotal = computeItemSubtotalMinor(quantity, item.unit_price_minor, item.discount_minor);
+  const subtotal = computeLineSubtotalMinor(quantity, item.unit_price_minor, item.discount_minor);
   try {
     await txn.runAsync(
       `UPDATE sale_item SET quantity = ?, subtotal_minor = ? WHERE id = ?`,
@@ -845,6 +833,36 @@ async function completeSaleWithTxn(
     throw repoError(REPO_ERROR.NOT_FOUND, `sale not found after complete: ${input.saleId}`);
   }
   return detail;
+}
+
+/**
+ * Create AND complete a sale in a single atomic transaction — the fresh-cart
+ * checkout path.
+ *
+ * A brand-new cart never persists a HELD sale first, so an abandoned cart
+ * never consumes a sale number and a failed charge leaves no dangling row.
+ * Reuses the exact `createHeldSaleWithTxn` + `completeSaleWithTxn` internals
+ * so validation, stock consumption and totals stay in one place.
+ */
+export async function checkoutSale(input: {
+  items: SaleItemInput[];
+  payments: PaymentInput[];
+  employeeId?: string;
+  notes?: string;
+}): Promise<SaleDetail> {
+  const businessId = await getBusinessId();
+  return withTransaction(async (txn) => {
+    const sale = await createHeldSaleWithTxn(txn, businessId, {
+      employeeId: input.employeeId,
+      notes: input.notes,
+      items: input.items,
+    });
+    return completeSaleWithTxn(txn, businessId, {
+      saleId: sale.id,
+      employeeId: input.employeeId,
+      payments: input.payments,
+    });
+  });
 }
 
 /**

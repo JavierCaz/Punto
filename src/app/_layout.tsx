@@ -142,6 +142,7 @@ export default function RootLayout() {
               <Stack.Screen name="inventory" />
               <Stack.Screen name="suppliers" />
               <Stack.Screen name="purchases" />
+              <Stack.Screen name="receipt" options={{ presentation: 'modal' }} />
             </Stack.Protected>
           </Stack>
         ) : null}

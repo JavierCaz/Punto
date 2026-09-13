@@ -11,6 +11,7 @@ import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
   createPaymentMethod,
+  ensureDefaultPaymentMethods,
   getPaymentMethodById,
   listPaymentMethods,
   updatePaymentMethod,
@@ -236,5 +237,89 @@ describe('payment method repository', () => {
         REPO_ERROR.NOT_FOUND,
       );
     });
+  });
+});
+
+describe('ensureDefaultPaymentMethods', () => {
+  let adapter: RecordingAdapter;
+
+  beforeEach(() => {
+    adapter = new RecordingAdapter();
+    (getDb as jest.Mock).mockResolvedValue(makeFakeDb(adapter));
+    resetBusinessIdForTesting();
+  });
+
+  it('seeds CASH/CARD/TRANSFER (CASH default) when the business has none', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM payment_method', []);
+
+    const result = await ensureDefaultPaymentMethods('es');
+
+    expect(result.map((method) => method.type)).toEqual(['CASH', 'CARD', 'TRANSFER']);
+    expect(result.map((method) => method.name)).toEqual(['Efectivo', 'Tarjeta', 'Transferencia']);
+    expect(result[0].isDefault).toBe(true);
+    expect(result[1].isDefault).toBe(false);
+
+    const inserts = adapter.calls.filter((call) =>
+      call.sql.includes('INSERT INTO payment_method'),
+    );
+    expect(inserts).toHaveLength(3);
+    // id, business_id, name, type, is_default, sort_order, created_at, updated_at
+    expect(inserts[0].params[1]).toBe('biz-1');
+    expect(inserts[0].params[2]).toBe('Efectivo');
+    expect(inserts[0].params[3]).toBe('CASH');
+    expect(inserts[0].params[4]).toBe(1); // is_default
+    expect(inserts[1].params[3]).toBe('CARD');
+    expect(inserts[1].params[4]).toBe(0);
+    expect(inserts[2].params[3]).toBe('TRANSFER');
+  });
+
+  it('seeds English names when asked for the en locale', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM payment_method', []);
+
+    const result = await ensureDefaultPaymentMethods('en');
+
+    expect(result.map((method) => method.name)).toEqual(['Cash', 'Card', 'Transfer']);
+  });
+
+  it('is idempotent: leaves a complete existing set untouched', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM payment_method', [
+      { ...PAYMENT_METHOD_ROW, id: 'pm-card', name: 'Card', type: 'CARD', is_default: 0, sort_order: 1 },
+      { ...PAYMENT_METHOD_ROW, id: 'pm-transfer', name: 'Transfer', type: 'TRANSFER', is_default: 0, sort_order: 2 },
+      PAYMENT_METHOD_ROW,
+    ]);
+
+    const result = await ensureDefaultPaymentMethods('es');
+
+    expect(result.map((method) => method.type)).toEqual(['CASH', 'CARD', 'TRANSFER']);
+    expect(adapter.calls.some((call) => call.sql.includes('INSERT INTO payment_method'))).toBe(false);
+  });
+
+  it('self-heals a partial set by inserting only the missing types', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM payment_method', [PAYMENT_METHOD_ROW]); // CASH only
+
+    const result = await ensureDefaultPaymentMethods('es');
+
+    const inserts = adapter.calls.filter((call) => call.sql.includes('INSERT INTO payment_method'));
+    expect(inserts).toHaveLength(2);
+    expect(inserts.map((call) => call.params[3])).toEqual(['CARD', 'TRANSFER']);
+    expect(result.map((method) => method.type)).toEqual(['CASH', 'CARD', 'TRANSFER']);
+  });
+
+  it('never resurrects an inactive method and filters it from the active list', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM payment_method', [
+      { ...PAYMENT_METHOD_ROW, is_active: 0 }, // hidden CASH
+      { ...PAYMENT_METHOD_ROW, id: 'pm-card', name: 'Card', type: 'CARD', is_default: 0, sort_order: 1 },
+      { ...PAYMENT_METHOD_ROW, id: 'pm-transfer', name: 'Transfer', type: 'TRANSFER', is_default: 0, sort_order: 2 },
+    ]);
+
+    const result = await ensureDefaultPaymentMethods('es');
+
+    expect(adapter.calls.some((call) => call.sql.includes('INSERT INTO payment_method'))).toBe(false);
+    expect(result.map((method) => method.type)).toEqual(['CARD', 'TRANSFER']);
   });
 });

@@ -292,3 +292,93 @@ async function updatePaymentMethodWithTxn(
   }
   return toPaymentMethod(mapPaymentMethodRow(row));
 }
+
+/** Locale keys for the seeded default methods (Spanish is canonical). */
+type DefaultPaymentMethodLanguage = 'es' | 'en';
+
+/**
+ * Canonical methods every business starts with, in display order. Names are
+ * localized at seed time so a Spanish-first business sees Spanish labels.
+ */
+ const DEFAULT_PAYMENT_METHODS: readonly {
+  type: PaymentType;
+  name: Record<DefaultPaymentMethodLanguage, string>;
+  sortOrder: number;
+}[] = [
+  { type: 'CASH', name: { es: 'Efectivo', en: 'Cash' }, sortOrder: 0 },
+  { type: 'CARD', name: { es: 'Tarjeta', en: 'Card' }, sortOrder: 1 },
+  { type: 'TRANSFER', name: { es: 'Transferencia', en: 'Transfer' }, sortOrder: 2 },
+];
+
+/**
+ * Ensure the business has its default payment methods (CASH, CARD, TRANSFER).
+ *
+ * Idempotent per TYPE: a default is inserted only when no method of that type
+ * exists (active OR inactive — a deliberately hidden method is never
+ * resurrected). This self-heals businesses created before this helper existed
+ * and leaves any user-managed methods untouched. CASH is promoted to default
+ * only when the business starts with no methods at all.
+ *
+ * Called lazily by the POS before opening the payment sheet so it also covers
+ * existing businesses. Names are localized at seed time.
+ */
+export async function ensureDefaultPaymentMethods(
+  language: DefaultPaymentMethodLanguage = 'es',
+): Promise<PaymentMethod[]> {
+  const businessId = await getBusinessId();
+  return withTransaction(async (txn) => {
+    const existing = await txn.getAllAsync<Record<string, unknown>>(
+      `SELECT ${PAYMENT_METHOD_COLUMNS} FROM payment_method WHERE business_id = ?`,
+      businessId,
+    );
+    const existingTypes = new Set(existing.map((row) => String(row.type)));
+    const timestamp = nowIso();
+    const seededFresh = existing.length === 0;
+
+    for (const definition of DEFAULT_PAYMENT_METHODS) {
+      if (existingTypes.has(definition.type)) {
+        continue;
+      }
+      const id = newId();
+      const isDefault = seededFresh && definition.type === 'CASH' ? 1 : 0;
+      try {
+        await txn.runAsync(
+          `INSERT INTO payment_method
+             (id, business_id, name, type, is_default, is_active, sort_order,
+              created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+          id,
+          businessId,
+          definition.name[language],
+          definition.type,
+          isDefault,
+          definition.sortOrder,
+          timestamp,
+          timestamp,
+        );
+      } catch (error) {
+        throw mapSqliteError(error);
+      }
+      existing.push({
+        id,
+        business_id: businessId,
+        name: definition.name[language],
+        type: definition.type,
+        is_default: isDefault,
+        is_active: 1,
+        sort_order: definition.sortOrder,
+        created_at: timestamp,
+        updated_at: timestamp,
+      });
+    }
+
+    return existing
+      .filter((row) => Number(row.is_active) === 1)
+      .sort(
+        (a, b) =>
+          Number(a.sort_order) - Number(b.sort_order) ||
+          String(a.name).localeCompare(String(b.name)),
+      )
+      .map((row) => toPaymentMethod(mapPaymentMethodRow(row)));
+  });
+}

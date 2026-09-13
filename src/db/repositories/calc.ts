@@ -127,3 +127,19 @@ export function computeRecipeCostMinor(
     0,
   );
 }
+
+/**
+ * Line subtotal in integer minor units: the per-display-unit price scaled by
+ * the milli-quantity, rounded, then reduced by any line discount. Integer-only
+ * (AGENTS §6 — no float money math).
+ *
+ * Shared by the sale repository and the POS cart so both compute identical
+ * line totals (the single source of truth for `round(qty*price/1000) − disc`).
+ */
+export function computeLineSubtotalMinor(
+  quantityMilli: number,
+  unitPriceMinor: number,
+  discountMinor: number,
+): number {
+  return Math.round((quantityMilli * unitPriceMinor) / 1000) - discountMinor;
+}

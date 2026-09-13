@@ -48,6 +48,7 @@ export {
   assertSufficientStock,
   computeChangeMinor,
   computeIngredientCostMinor,
+  computeLineSubtotalMinor,
   computeRecipeConsumptionMilli,
   computeRecipeCostMinor,
   computeTaxMinor,
@@ -136,6 +137,7 @@ export type {
 // Payment methods.
 export {
   createPaymentMethod,
+  ensureDefaultPaymentMethods,
   getPaymentMethodById,
   listPaymentMethods,
   updatePaymentMethod,
@@ -243,6 +245,7 @@ export type {
 export {
   addSaleItem,
   cancelSale,
+  checkoutSale,
   completeSale,
   createHeldSale,
   getSaleById,

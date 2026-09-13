@@ -14,6 +14,7 @@ import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
   addSaleItem,
   cancelSale,
+  checkoutSale,
   completeSale,
   createHeldSale,
   getSaleById,
@@ -700,5 +701,54 @@ describe('sale repository', () => {
         50,
       ]);
     });
+  });
+});
+
+describe('checkoutSale', () => {
+  let adapter: RecordingAdapter;
+
+  beforeEach(() => {
+    adapter = new RecordingAdapter();
+    (getDb as jest.Mock).mockResolvedValue(makeFakeDb(adapter));
+    resetBusinessIdForTesting();
+  });
+
+  it('creates and completes a fresh sale in one transaction (no dangling HELD row)', async () => {
+    const untrackedItem = { ...SALE_ITEM_ROW, product_id: null };
+    const completedSale = {
+      ...SALE_ROW,
+      status: 'COMPLETED',
+      subtotal_minor: 500,
+      total_minor: 500,
+      completed_at: '2026-01-01T01:00:00.000Z',
+    };
+
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueFirst('FROM app_metadata', { value: null }); // nextSaleNumber → S-000001
+    adapter.queueFirst('SUM(subtotal_minor)', { total: 500 });
+    adapter.queueFirst('discount_minor FROM sale', { discount_minor: 0 });
+    adapter.queueFirst('FROM sale', { ...SALE_ROW, subtotal_minor: 500, total_minor: 500 }); // held load
+    adapter.queueFirst('FROM sale', { ...SALE_ROW, subtotal_minor: 500, total_minor: 500 }); // complete load (HELD)
+    adapter.queueAll('FROM sale_item', [untrackedItem]);
+    adapter.queueFirst('type FROM payment_method', { type: 'CASH' });
+    adapter.queueFirst('FROM sale', completedSale); // select-back
+    adapter.queueAll('FROM sale_item', [untrackedItem]);
+    adapter.queueAll('FROM payment', [PAYMENT_ROW]);
+
+    const result = await checkoutSale({
+      items: [
+        { productId: null, productName: 'Matcha Latte', quantity: 1000, unitPriceMinor: 500 },
+      ],
+      payments: [{ paymentMethodId: 'pm-cash', amountMinor: 500, amountGivenMinor: 500 }],
+    });
+
+    // One sale INSERT, one completion flip, never a cancellation.
+    expect(adapter.calls.filter((call) => call.sql.includes('INSERT INTO sale\n'))).toHaveLength(1);
+    expect(adapter.calls.some((call) => call.sql.includes("status = 'COMPLETED'"))).toBe(true);
+    expect(adapter.calls.some((call) => call.sql.includes("status = 'CANCELLED'"))).toBe(false);
+    expect(result.status).toBe('COMPLETED');
+    expect(result.totalMinor).toBe(500);
+    expect(result.items).toHaveLength(1);
+    expect(result.payments).toHaveLength(1);
   });
 });

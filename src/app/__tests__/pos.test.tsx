@@ -58,6 +58,7 @@ const mockCatalog = {
   ],
   categories: [],
   recipeProductIds: new Set<string>(),
+  productCostMinor: new Map<string, number>(),
   currency: 'MXN',
   loading: false,
   loadFailed: false,
