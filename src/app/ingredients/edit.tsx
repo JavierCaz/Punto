@@ -19,6 +19,7 @@ import {
   listSupplierItems,
   listSuppliers,
   listUnits,
+  MANUAL_ADJUSTMENT_REASON,
   recordMovement,
   updateInventoryItem,
   upsertSupplierItem,
@@ -139,7 +140,7 @@ export default function InventoryItemEditScreen() {
           await adjustQuantity({
             inventoryItemId: item.id,
             newQuantity: adjustedQuantity,
-            reason: 'manual',
+            reason: MANUAL_ADJUSTMENT_REASON,
           });
         }
 

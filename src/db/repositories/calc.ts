@@ -85,6 +85,33 @@ export function assertSufficientStock(
 }
 
 /**
+ * Stock health derived from an item's current quantity and its low-stock
+ * threshold (both milli-units). This is the SINGLE source of truth for the
+ * amber "low stock" / red "out of stock" indicators used by the stock overview
+ * and the item detail screen.
+ *
+ * Rules (in order):
+ *   - `current <= 0`            → `'out'` (red; nothing left to sell).
+ *   - `minimum > 0 && current <= minimum` → `'low'` (amber).
+ *   - otherwise                 → `'ok'`.
+ *
+ * A threshold of 0 disables the warning (an item with stock is never "low").
+ *
+ * NOTE: `listLowStockItems` is a broader "needs attention" query — it returns
+ * every item at or below its threshold, INCLUDING out-of-stock (`current <= 0`)
+ * rows. Callers that need the amber/red split must run each row through this
+ * helper, which classifies `current <= 0` as `'out'`, never `'low'`.
+ */
+export const STOCK_STATUSES = ['out', 'low', 'ok'] as const;
+export type StockStatus = (typeof STOCK_STATUSES)[number];
+
+export function getStockStatus(currentQuantity: number, minimumQuantity: number): StockStatus {
+  if (currentQuantity <= 0) return 'out';
+  if (minimumQuantity > 0 && currentQuantity <= minimumQuantity) return 'low';
+  return 'ok';
+}
+
+/**
  * Ingredient quantity consumed by selling `lineQuantityMilli` of a product
  * whose recipe uses `recipeQuantityMilli` of the ingredient per portion.
  *

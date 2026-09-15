@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FormField } from './form-field';
+import { ListRow } from './list-row';
 import { PrimaryButton } from './primary-button';
 import { SecondaryButton } from './secondary-button';
 import { ThemedText } from './themed-text';
@@ -29,10 +31,21 @@ export type PaymentPanelProps = {
   onSubmit: (payments: PaymentInput[]) => void;
 };
 
+function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
 /**
- * Payment selection: one money input per method (single or split), plus cash
- * tender and change for CASH methods. Every amount is parsed to integer minor
- * units and validated against the sale total before the charge can be confirmed.
+ * Payment selection. Methods are opt-in: the cashier adds the methods they need
+ * ("Agregar método de pago"), each added method gets a money input and a remove
+ * icon, and the charge is validated against the sale total.
+ *
+ * For CASH the input is the amount RECEIVED (tendered), not the amount applied:
+ * the applied amount is capped at what the other methods leave, and the excess
+ * is shown as change. So entering 500 for a 160 total applies 160 and shows 340
+ * change instead of failing validation. Non-cash inputs are exact amounts.
  */
 export function PaymentPanel({
   totalMinor,
@@ -45,41 +58,66 @@ export function PaymentPanel({
   const { t } = useTranslation();
   const theme = useTheme();
 
+  const [added, setAdded] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
-  const [givens, setGivens] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState(false);
 
-  const allocations = useMemo<PaymentAllocation[]>(() => {
-    const result: PaymentAllocation[] = [];
-    for (const method of methods) {
-      const amountMinor = parseMoneyInput(amounts[method.id] ?? '');
-      if (amountMinor == null || amountMinor <= 0) {
-        continue;
-      }
-      const allocation: PaymentAllocation = { methodId: method.id, amountMinor };
-      if (method.type === 'CASH' && (givens[method.id] ?? '').trim() !== '') {
-        const givenMinor = parseMoneyInput(givens[method.id] ?? '');
-        if (givenMinor != null) {
-          allocation.amountGivenMinor = givenMinor;
-        }
-      }
-      result.push(allocation);
-    }
-    return result;
-  }, [methods, amounts, givens]);
+  const addedMethods = added
+    .map((id) => methods.find((method) => method.id === id))
+    .filter((method): method is PaymentMethod => method != null);
+  const availableMethods = methods.filter((method) => !added.includes(method.id));
 
-  const hasInvalidInput = methods.some((method) => {
-    const raw = (amounts[method.id] ?? '').trim();
-    if (raw !== '' && parseMoneyInput(raw) == null) {
-      return true;
+  const amountFor = (methodId: string): number => parseMoneyInput(amounts[methodId] ?? '') ?? 0;
+
+  // Cash covers whatever the other methods leave; any excess becomes change.
+  const nonCashSum = addedMethods
+    .filter((method) => method.type !== 'CASH')
+    .reduce((sum, method) => sum + amountFor(method.id), 0);
+  const cashDue = Math.max(0, totalMinor - nonCashSum);
+
+  const appliedCash: Record<string, number> = {};
+  let cashPool = cashDue;
+  for (const method of addedMethods) {
+    if (method.type !== 'CASH') {
+      continue;
     }
-    const givenRaw = (givens[method.id] ?? '').trim();
-    return method.type === 'CASH' && givenRaw !== '' && parseMoneyInput(givenRaw) == null;
+    const entered = amountFor(method.id);
+    if (entered <= 0) {
+      continue;
+    }
+    const applied = cashPool > 0 ? Math.min(entered, cashPool) : entered;
+    appliedCash[method.id] = applied;
+    cashPool -= applied;
+  }
+
+  const allocations: PaymentAllocation[] = [];
+  for (const method of addedMethods) {
+    const entered = amountFor(method.id);
+    if (entered <= 0) {
+      continue;
+    }
+    if (method.type === 'CASH') {
+      const applied = appliedCash[method.id] ?? entered;
+      const allocation: PaymentAllocation = { methodId: method.id, amountMinor: applied };
+      // Only record the tender when it actually produces change.
+      if (entered > applied) {
+        allocation.amountGivenMinor = entered;
+      }
+      allocations.push(allocation);
+    } else {
+      allocations.push({ methodId: method.id, amountMinor: entered });
+    }
+  }
+
+  const hasInvalidInput = addedMethods.some((method) => {
+    const raw = (amounts[method.id] ?? '').trim();
+    return raw !== '' && parseMoneyInput(raw) == null;
   });
 
   const remaining = remainingMinor(totalMinor, allocations);
   const issue = hasInvalidInput ? 'amount-invalid' : validatePayments(totalMinor, methods, allocations);
-  const canSubmit = issue === null && !submitting && methods.length > 0;
+  const canSubmit = issue === null && !submitting && addedMethods.length > 0;
 
   const issueText =
     issue === 'remaining'
@@ -97,16 +135,24 @@ export function PaymentPanel({
     setAmounts((previous) => ({ ...previous, [methodId]: value }));
   };
 
-  const setGiven = (methodId: string, value: string): void => {
-    setTouched(true);
-    setGivens((previous) => ({ ...previous, [methodId]: value }));
-  };
 
   const fillRemaining = (methodId: string): void => {
     setTouched(true);
     if (remaining > 0) {
       setAmounts((previous) => ({ ...previous, [methodId]: formatMoneyInput(remaining) }));
     }
+  };
+
+  const addMethod = (methodId: string): void => {
+    setTouched(true);
+    setAdded((previous) => (previous.includes(methodId) ? previous : [...previous, methodId]));
+    setPickerOpen(false);
+  };
+
+  const removeMethod = (methodId: string): void => {
+    setTouched(true);
+    setAdded((previous) => previous.filter((id) => id !== methodId));
+    setAmounts((previous) => withoutKey(previous, methodId));
   };
 
   if (methods.length === 0) {
@@ -134,19 +180,38 @@ export function PaymentPanel({
         ) : null}
       </View>
 
-      {methods.map((method) => {
-        const amount = parseMoneyInput(amounts[method.id] ?? '') ?? 0;
-        const given = method.type === 'CASH' ? parseMoneyInput(givens[method.id] ?? '') : null;
-        const change = given != null && amount > 0 ? given - amount : 0;
+      {addedMethods.map((method) => {
+        const isCash = method.type === 'CASH';
+        const entered = amountFor(method.id);
+        const applied = isCash ? appliedCash[method.id] ?? entered : entered;
+        const change = isCash && entered > applied ? entered - applied : 0;
 
         return (
           <View
             key={method.id}
             testID={`payment-method-${method.id}`}
             style={[styles.method, { borderColor: theme.border }]}>
+            <View style={styles.methodHeader}>
+              <ThemedText type="body1" style={styles.methodName}>
+                {method.name}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('pos.payment.removeMethod', { name: method.name })}
+                testID={`payment-remove-${method.id}`}
+                onPress={() => removeMethod(method.id)}
+                style={styles.removeButton}>
+                <MaterialCommunityIcons
+                  name="close-circle-outline"
+                  size={22}
+                  color={theme.danger}
+                />
+              </Pressable>
+            </View>
+
             <FormField
-              label={method.name}
-              accessibilityLabel={method.name}
+              label={isCash ? t('pos.payment.amountGiven') : t('pos.payment.amountLabel')}
+              accessibilityLabel={isCash ? t('pos.payment.amountGiven') : t('pos.payment.amountLabel')}
               placeholder="0.00"
               value={amounts[method.id] ?? ''}
               onChangeText={(value) => setAmount(method.id, value)}
@@ -160,29 +225,22 @@ export function PaymentPanel({
               onPress={() => fillRemaining(method.id)}
             />
 
-            {method.type === 'CASH' && amount > 0 ? (
+            {isCash && entered > 0 ? (
               <View style={styles.cash}>
-                <FormField
-                  label={t('pos.payment.amountGiven')}
-                  accessibilityLabel={t('pos.payment.amountGiven')}
-                  placeholder={formatMoneyInput(amount)}
-                  value={givens[method.id] ?? ''}
-                  onChangeText={(value) => setGiven(method.id, value)}
-                  keyboardType="decimal-pad"
-                  testID={`payment-given-${method.id}`}
-                />
                 <View style={styles.quick}>
                   <SecondaryButton
                     label={t('pos.payment.exact')}
-                    onPress={() => setGiven(method.id, formatMoneyInput(amount))}
+                    onPress={() => setAmount(method.id, formatMoneyInput(cashDue))}
                   />
-                  {quickCashAmounts(amount).map((suggestion) => (
-                    <SecondaryButton
-                      key={suggestion}
-                      label={formatMoney(suggestion, currency)}
-                      onPress={() => setGiven(method.id, formatMoneyInput(suggestion))}
-                    />
-                  ))}
+                  {quickCashAmounts(cashDue)
+                    .filter((suggestion) => suggestion !== cashDue)
+                    .map((suggestion) => (
+                      <SecondaryButton
+                        key={suggestion}
+                        label={formatMoney(suggestion, currency)}
+                        onPress={() => setAmount(method.id, formatMoneyInput(suggestion))}
+                      />
+                    ))}
                 </View>
                 {change > 0 ? (
                   <View style={styles.changeRow} testID={`payment-change-${method.id}`}>
@@ -199,6 +257,38 @@ export function PaymentPanel({
           </View>
         );
       })}
+
+      {availableMethods.length > 0 ? (
+        <View style={styles.addSection}>
+          <SecondaryButton
+            label={t('pos.payment.addMethod')}
+            icon="plus"
+            onPress={() => setPickerOpen((open) => !open)}
+          />
+          {pickerOpen ? (
+            <View
+              style={[
+                styles.optionList,
+                { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+              ]}>
+              {availableMethods.map((method, index) => (
+                <ListRow
+                  key={method.id}
+                  title={method.name}
+                  icon="plus"
+                  onPress={() => addMethod(method.id)}
+                  divided={index < availableMethods.length - 1}
+                  testID={`payment-option-${method.id}`}
+                />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <ThemedText type="body2" themeColor="textSecondary">
+          {t('pos.payment.allMethodsAdded')}
+        </ThemedText>
+      )}
 
       {touched && issueText != null ? (
         <ThemedText type="body2" themeColor="danger" testID="payment-issue">
@@ -242,6 +332,21 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.three,
   },
+  methodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  methodName: {
+    flex: 1,
+  },
+  removeButton: {
+    width: TouchTarget.min,
+    height: TouchTarget.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cash: {
     gap: Spacing.two,
   },
@@ -255,6 +360,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
+  },
+  addSection: {
+    gap: Spacing.two,
+  },
+  optionList: {
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
   confirm: {
     minHeight: TouchTarget.action,

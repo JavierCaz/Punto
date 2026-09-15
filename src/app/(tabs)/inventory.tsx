@@ -12,7 +12,14 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 
 import { Radius, Spacing, TouchTarget } from '@/constants/theme';
-import { ensureDefaultUnits, listInventoryItems, listUnits, type InventoryItem, type Unit } from '@/db';
+import {
+  ensureDefaultUnits,
+  getStockStatus,
+  listInventoryItems,
+  listUnits,
+  type InventoryItem,
+  type Unit,
+} from '@/db';
 import { useTheme } from '@/hooks/use-theme';
 import { formatQuantityMilli } from '@/lib/catalog-form';
 
@@ -114,10 +121,8 @@ export default function InventoryScreen() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const unitSymbol = unitSymbolFor(item.unitId);
-            const outOfStock = item.currentQuantity <= 0;
-            const lowStock =
-              !outOfStock && item.minimumQuantity > 0 && item.currentQuantity <= item.minimumQuantity;
-            const badgeColor = outOfStock ? theme.danger : theme.warning;
+            const status = getStockStatus(item.currentQuantity, item.minimumQuantity);
+            const badgeColor = status === 'out' ? theme.danger : theme.warning;
 
             return (
               <Pressable
@@ -143,10 +148,10 @@ export default function InventoryScreen() {
                     {`${formatQuantityMilli(item.currentQuantity)} ${unitSymbol}`}
                   </ThemedText>
                 </View>
-                {outOfStock || lowStock ? (
+                {status !== 'ok' ? (
                   <View style={[styles.badge, { borderColor: badgeColor }]}>
                     <ThemedText type="micro" style={{ color: badgeColor }}>
-                      {outOfStock ? t('inventory.outOfStock') : t('inventory.lowStock')}
+                      {status === 'out' ? t('inventory.outOfStock') : t('inventory.lowStock')}
                     </ThemedText>
                   </View>
                 ) : null}

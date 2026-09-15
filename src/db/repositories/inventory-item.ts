@@ -162,6 +162,10 @@ export async function getInventoryItemById(id: string): Promise<InventoryItem | 
  * `minimum_quantity > 0` AND `current_quantity <= minimum_quantity`, ordered by
  * the most-critical (lowest) quantity first. Reads the `current_quantity` cache
  * that the ledger maintains (never written here — see the module invariant).
+ *
+ * This is a broad "needs attention" list: it INCLUDES out-of-stock rows
+ * (`current_quantity <= 0`). Callers that must distinguish amber (low) from
+ * red (out) should classify each row with `getStockStatus`.
  */
 export async function listLowStockItems(): Promise<InventoryItem[]> {
   const businessId = await getBusinessId();

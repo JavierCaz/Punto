@@ -249,6 +249,14 @@ export async function recordMovementWithTxn(
   }
 }
 
+/**
+ * Stable reason code for a manual stock-count correction. Stored language-
+ * neutrally in the ledger and localized at render time (the movement history
+ * translates this code instead of showing the raw string). Free-text reasons
+ * entered by the owner are stored verbatim and shown as-is.
+ */
+export const MANUAL_ADJUSTMENT_REASON = 'manual';
+
 /** Request a manual stock-count correction. */
 export async function adjustQuantity(input: {
   inventoryItemId: string;

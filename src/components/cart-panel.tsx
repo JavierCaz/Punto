@@ -17,9 +17,8 @@ export type CartPanelProps = {
   currency: string;
   /** Open the payment sheet (mobile) / charge (tablet). */
   onCharge: () => void;
-  /** Open the held-sales sheet. Omit to hide the affordance. */
-  onOpenHeld?: () => void;
-  heldCount?: number;
+  /** Hold the cart. When omitted, the store's hold action is used directly. */
+  onHold?: () => void;
   /** Name of the employee attributed to the sale. */
   employeeName?: string | null;
   /** When provided, the attribution row becomes a picker trigger. */
@@ -69,8 +68,7 @@ function useCartErrorMessage(): string | null {
 export function CartPanel({
   currency,
   onCharge,
-  onOpenHeld,
-  heldCount = 0,
+  onHold,
   employeeName,
   onChangeEmployee,
   testIDPrefix = 'cart-panel',
@@ -164,25 +162,6 @@ export function CartPanel({
         </Pressable>
       ) : null}
 
-      {onOpenHeld ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenHeld}
-          testID={`${testIDPrefix}-held`}
-          style={({ pressed }) => [
-            styles.held,
-            { borderColor: theme.border, backgroundColor: theme.backgroundElement },
-            pressed && styles.pressed,
-          ]}>
-          <MaterialCommunityIcons name="clock-outline" size={18} color={theme.warning} />
-          <ThemedText type="body2" style={styles.heldText}>
-            {t('pos.held.title')}
-          </ThemedText>
-          <ThemedText type="body2" themeColor="textSecondary">
-            {heldCount}
-          </ThemedText>
-        </Pressable>
-      ) : null}
 
       {errorMessage ? (
         <ThemedText type="body2" themeColor="danger" testID={`${testIDPrefix}-error`}>
@@ -195,7 +174,7 @@ export function CartPanel({
           label={t('pos.cart.hold')}
           icon="clock-outline"
           disabled={empty || busy}
-          onPress={() => void hold()}
+          onPress={onHold ?? (() => void hold())}
           style={styles.action}
         />
         <PrimaryButton
@@ -268,18 +247,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   attributionText: {
-    flex: 1,
-  },
-  held: {
-    minHeight: TouchTarget.min,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-  },
-  heldText: {
     flex: 1,
   },
   pressed: {

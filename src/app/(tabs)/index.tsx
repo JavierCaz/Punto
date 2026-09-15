@@ -2,7 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, InteractionManager, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { listActiveEmployees, useAuthStore } from '@/auth';
 import { BottomSheet } from '@/components/bottom-sheet';
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { OptionRow } from '@/components/option-row';
 import { PaymentPanel } from '@/components/payment-panel';
 import { ProductCard } from '@/components/product-card';
+import { PulseHighlight } from '@/components/pulse-highlight';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
@@ -63,6 +64,7 @@ export default function PosScreen() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [heldSales, setHeldSales] = useState<Sale[]>([]);
   const [employees, setEmployees] = useState<Awaited<ReturnType<typeof listActiveEmployees>>>([]);
+  const [heldPulseToken, setHeldPulseToken] = useState(0);
 
   const lines = useCartStore((state) => state.lines);
   const busy = useCartStore((state) => state.busy);
@@ -71,6 +73,7 @@ export default function PosScreen() {
   const addProduct = useCartStore((state) => state.addProduct);
   const resumeCart = useCartStore((state) => state.resume);
   const checkout = useCartStore((state) => state.checkout);
+  const hold = useCartStore((state) => state.hold);
   const setEmployee = useCartStore((state) => state.setEmployee);
   const cartSaleId = useCartStore((state) => state.saleId);
   const discardCart = useCartStore((state) => state.discard);
@@ -141,10 +144,17 @@ export default function PosScreen() {
     }
     setActiveSheet('none');
     await loadHeld();
-    // Wait for the sheet dismissal animation before presenting the receipt modal.
-    InteractionManager.runAfterInteractions(() => {
+    // Defer past the sheet dismissal so iOS does not present while dismissing.
+    setTimeout(() => {
       router.push({ pathname: '/receipt/[id]', params: { id: detail.id } });
-    });
+    }, 0);
+  };
+
+  const handleHold = async (): Promise<void> => {
+    await hold();
+    setActiveSheet('none');
+    await loadHeld();
+    setHeldPulseToken((token) => token + 1);
   };
 
   const resumeHeld = async (saleId: string): Promise<void> => {
@@ -271,11 +281,7 @@ export default function PosScreen() {
     <CartPanel
       currency={currency}
       onCharge={() => setActiveSheet('payment')}
-      onOpenHeld={() => {
-        void loadHeld();
-        setActiveSheet('held');
-      }}
-      heldCount={heldSales.length}
+      onHold={() => void handleHold()}
       employeeName={employeeName}
       {...(isAdmin ? { onChangeEmployee: () => setActiveSheet('employee') } : {})}
     />
@@ -291,7 +297,7 @@ export default function PosScreen() {
               {today}
             </ThemedText>
           </View>
-          {!isTablet && heldSales.length > 0 ? (
+          {heldSales.length > 0 ? (
             <Pressable
               accessibilityRole="button"
               testID="pos-held-button"
@@ -300,6 +306,12 @@ export default function PosScreen() {
                 setActiveSheet('held');
               }}
               style={[styles.heldButton, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+              <PulseHighlight
+                token={heldPulseToken}
+                color={theme.warning}
+                borderRadius={Radius.md}
+                testID="pos-held-pulse"
+              />
               <MaterialCommunityIcons name="clock-outline" size={18} color={theme.warning} />
               <ThemedText type="body2">{heldSales.length}</ThemedText>
             </Pressable>
@@ -424,6 +436,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
+    overflow: 'hidden',
   },
   split: {
     flex: 1,

@@ -23,6 +23,7 @@ import {
   removeSaleItem,
   updateSaleItemQuantity,
 } from '@/db/repositories/sale';
+import { getStockStatus } from '@/db/repositories/calc';
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 
@@ -399,6 +400,63 @@ describe('sale repository', () => {
       expect(result.items).toHaveLength(2);
       expect(result.payments).toHaveLength(1);
       expect(result.totalMinor).toBe(1000);
+    });
+
+    it('drains a bridged item below its threshold so the badge flips (Milestone 6)', async () => {
+      // Healthy: 0.6 units in stock with a 0.5 threshold.
+      const currentQuantity = 600;
+      const minimumQuantity = 500;
+      const lineQuantity = 400; // the sale sells 0.4 → 0.2 left → below threshold
+
+      const bridgeItem = {
+        ...SALE_ITEM_ROW,
+        id: 'si-bridge',
+        product_id: 'prod-bridge',
+        quantity: lineQuantity,
+      };
+
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('FROM sale', heldSale); // 1. load sale
+      adapter.queueAll('FROM sale_item', [bridgeItem]); // 2. load items
+      adapter.queueFirst('type FROM payment_method', { type: 'CASH' }); // 3. payment method
+      // 4. consume — direct bridge.
+      adapter.queueFirst('inventory_item_id FROM product', { inventory_item_id: 'inv-bridge' });
+      adapter.queueFirst('FROM inventory_item', {
+        id: 'inv-bridge',
+        unit_id: 'u1',
+        current_quantity: currentQuantity,
+      });
+      adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
+      // 5. select-back detail.
+      adapter.queueFirst('FROM sale', completedSale);
+      adapter.queueAll('FROM sale_item', [bridgeItem]);
+      adapter.queueAll('FROM payment', [PAYMENT_ROW]);
+
+      await completeSale({
+        saleId: 'sale-1',
+        payments: [{ paymentMethodId: 'pm-cash', amountMinor: 1000 }],
+      });
+
+      // The ledger posts a negative SALE movement for the sold quantity…
+      const movement = adapter.calls.find((c) => c.sql.includes('INSERT INTO inventory_movement'));
+      expect(movement).toBeDefined();
+      expect(movement!.params[3]).toBe('SALE');
+      expect(movement!.params[4]).toBe(-lineQuantity);
+
+      // …and the cache update applies that same signed delta atomically.
+      const cacheUpdate = adapter.calls.find(
+        (c) =>
+          c.sql.includes('UPDATE inventory_item') &&
+          c.sql.includes('current_quantity = current_quantity + ?'),
+      );
+      expect(cacheUpdate).toBeDefined();
+      const delta = cacheUpdate!.params[0] as number;
+      expect(delta).toBe(-lineQuantity);
+
+      // The threshold helper therefore flips the badge automatically — no
+      // extra write after the sale: healthy before, low after.
+      expect(getStockStatus(currentQuantity, minimumQuantity)).toBe('ok');
+      expect(getStockStatus(currentQuantity + delta, minimumQuantity)).toBe('low');
     });
 
     it('deducts recipe ingredients for a matcha latte sale', async () => {

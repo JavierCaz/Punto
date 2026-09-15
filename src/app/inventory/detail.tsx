@@ -14,10 +14,12 @@ import {
   adjustQuantity,
   getBusinessProfile,
   getInventoryItemById,
+  getStockStatus,
   listMovements,
   listSupplierItems,
   listSuppliers,
   listUnits,
+  MANUAL_ADJUSTMENT_REASON,
   type InventoryItem,
   type InventoryMovement,
   type Supplier,
@@ -73,6 +75,7 @@ export default function InventoryDetailScreen() {
   const [loading, setLoading] = useState(id != null);
   const [loadFailed, setLoadFailed] = useState(id == null);
   const [adjustInput, setAdjustInput] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
   const [adjusting, setAdjusting] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
   const [adjustSaved, setAdjustSaved] = useState(false);
@@ -158,10 +161,18 @@ export default function InventoryDetailScreen() {
     setAdjustError(null);
     setAdjustSaved(false);
     try {
-      await adjustQuantity({ inventoryItemId: item.id, newQuantity: parsed, reason: 'manual' });
+      await adjustQuantity({
+        inventoryItemId: item.id,
+        newQuantity: parsed,
+        // A blank reason falls back to the stable 'manual' code, which the
+        // history localizes; a typed reason is stored verbatim.
+        reason: adjustReason.trim() || MANUAL_ADJUSTMENT_REASON,
+      });
       await loadRef.current();
       if (mountedRef.current) {
         setAdjustSaved(true);
+        // The quantity reloads from the item; clear the one-shot reason too.
+        setAdjustReason('');
       }
     } catch {
       if (mountedRef.current) {
@@ -175,14 +186,9 @@ export default function InventoryDetailScreen() {
   };
 
   const unitSymbol = unit?.symbol ?? '';
-  const outOfStock = item != null && item.currentQuantity <= 0;
-  const lowStock =
-    item != null &&
-    !outOfStock &&
-    item.minimumQuantity > 0 &&
-    item.currentQuantity <= item.minimumQuantity;
-  const badgeColor = outOfStock ? theme.danger : theme.warning;
-  const badgeLabel = outOfStock ? t('inventory.outOfStock') : t('inventory.lowStock');
+  const stockStatus = item ? getStockStatus(item.currentQuantity, item.minimumQuantity) : 'ok';
+  const badgeColor = stockStatus === 'out' ? theme.danger : theme.warning;
+  const badgeLabel = stockStatus === 'out' ? t('inventory.outOfStock') : t('inventory.lowStock');
 
   return (
     <Screen scroll header contentContainerStyle={styles.content}>
@@ -218,7 +224,7 @@ export default function InventoryDetailScreen() {
               <ThemedText type="body2" themeColor="textSecondary">
                 {t('inventory.currentStock')}
               </ThemedText>
-              {outOfStock || lowStock ? (
+              {stockStatus !== 'ok' ? (
                 <View style={[styles.badge, { borderColor: badgeColor }]}>
                   <ThemedText type="micro" style={{ color: badgeColor }}>
                     {badgeLabel}
@@ -260,28 +266,38 @@ export default function InventoryDetailScreen() {
               </ThemedText>
             ) : (
               <View style={styles.movementList}>
-                {movements.map((movement) => (
-                  <View
-                    key={movement.id}
-                    style={[styles.movementRow, { borderColor: theme.border }]}>
-                    <View style={styles.movementMain}>
-                      <ThemedText type="body1">
-                        {t(`inventory.movement.${movement.type}`)}
-                      </ThemedText>
-                      <ThemedText type="code" themeColor="textSecondary">
-                        {formatSignedQuantity(movement.quantity, unitSymbol)}
-                      </ThemedText>
-                      {movement.reason ? (
-                        <ThemedText type="body2" themeColor="textSecondary">
-                          {movement.reason}
+                {movements.map((movement) => {
+                  // The stable 'manual' code is localized; owner-typed reasons
+                  // and any other movement reason render verbatim.
+                  const reasonLabel =
+                    movement.type === 'ADJUSTMENT' &&
+                    movement.reason === MANUAL_ADJUSTMENT_REASON
+                      ? t('inventory.movement.reasonManual')
+                      : movement.reason;
+
+                  return (
+                    <View
+                      key={movement.id}
+                      style={[styles.movementRow, { borderColor: theme.border }]}>
+                      <View style={styles.movementMain}>
+                        <ThemedText type="body1">
+                          {t(`inventory.movement.${movement.type}`)}
                         </ThemedText>
-                      ) : null}
+                        <ThemedText type="code" themeColor="textSecondary">
+                          {formatSignedQuantity(movement.quantity, unitSymbol)}
+                        </ThemedText>
+                        {reasonLabel ? (
+                          <ThemedText type="body2" themeColor="textSecondary">
+                            {reasonLabel}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                      <ThemedText type="body2" themeColor="textSecondary">
+                        {formatDate(movement.createdAt)}
+                      </ThemedText>
                     </View>
-                    <ThemedText type="body2" themeColor="textSecondary">
-                      {formatDate(movement.createdAt)}
-                    </ThemedText>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>
@@ -302,6 +318,18 @@ export default function InventoryDetailScreen() {
               error={adjustError ?? undefined}
               keyboardType="decimal-pad"
               testID="inventory-adjust-input"
+            />
+            <FormField
+              label={t('inventory.detail.adjustReasonLabel')}
+              accessibilityLabel={t('inventory.detail.adjustReasonLabel')}
+              placeholder={t('inventory.detail.adjustReasonPlaceholder')}
+              value={adjustReason}
+              onChangeText={(value) => {
+                setAdjustReason(value);
+                setAdjustSaved(false);
+              }}
+              hint={t('inventory.detail.adjustReasonHint')}
+              testID="inventory-adjust-reason"
             />
             {adjustSaved ? (
               <ThemedText type="body2" themeColor="success">

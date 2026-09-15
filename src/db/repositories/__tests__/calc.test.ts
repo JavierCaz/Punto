@@ -12,6 +12,7 @@ import {
   computeRecipeConsumptionMilli,
   computeRecipeCostMinor,
   computeTaxMinor,
+  getStockStatus,
   scaleQuantityByCount,
   sumMinor,
   weightedAverageUnitCostMinor,
@@ -150,5 +151,42 @@ describe('computeRecipeCostMinor', () => {
 
   it('returns 0 for an empty ingredient list', () => {
     expect(computeRecipeCostMinor([])).toBe(0);
+  });
+});
+
+/**
+ * Threshold logic — the single source of truth for the amber/red stock
+ * indicators. Milestone 6: a sale drains stock and the badge must flip
+ * automatically (ok → low → out) without any extra write.
+ */
+describe('getStockStatus', () => {
+  it('reports out of stock at or below zero, regardless of threshold', () => {
+    expect(getStockStatus(0, 1000)).toBe('out');
+    expect(getStockStatus(-1, 1000)).toBe('out');
+    expect(getStockStatus(0, 0)).toBe('out');
+  });
+
+  it('reports low stock at or below a positive threshold', () => {
+    expect(getStockStatus(1000, 1000)).toBe('low'); // boundary: exactly at the threshold
+    expect(getStockStatus(999, 1000)).toBe('low');
+    expect(getStockStatus(1, 1000)).toBe('low');
+  });
+
+  it('reports ok above the threshold', () => {
+    expect(getStockStatus(1001, 1000)).toBe('ok');
+    expect(getStockStatus(2000, 1000)).toBe('ok');
+  });
+
+  it('disables the warning when the threshold is 0', () => {
+    expect(getStockStatus(1, 0)).toBe('ok');
+    expect(getStockStatus(500, 0)).toBe('ok');
+  });
+
+  it('flips ok → low → out as simulated sales drain the stock', () => {
+    const threshold = 500;
+    expect(getStockStatus(1000, threshold)).toBe('ok'); // 1 unit in stock
+    expect(getStockStatus(600, threshold)).toBe('ok'); // sold 0.4
+    expect(getStockStatus(400, threshold)).toBe('low'); // sold 0.2 → below threshold
+    expect(getStockStatus(0, threshold)).toBe('out'); // sold the rest
   });
 });

@@ -36,10 +36,13 @@ jest.mock('@/db', () => ({
   adjustQuantity: jest.fn(async () => {}),
   getBusinessProfile: jest.fn(async () => ({ currencyCode: 'MXN' })),
   getInventoryItemById: jest.fn(async () => null),
+  // Real threshold helper + the stable manual reason code the screen uses.
+  getStockStatus: jest.requireActual('@/db/repositories/calc').getStockStatus,
   listMovements: jest.fn(async () => ({ items: [], nextCursor: null })),
   listSupplierItems: jest.fn(async () => []),
   listSuppliers: jest.fn(async () => []),
   listUnits: jest.fn(async () => []),
+  MANUAL_ADJUSTMENT_REASON: 'manual',
 }));
 
 jest.mock('expo-localization', () => ({
@@ -122,12 +125,63 @@ const movement: InventoryMovement = {
   quantity: 2500,
   unitId: 'unit-1',
   unitCostMinor: 0,
-  reason: 'Compra semanal',
+  reason: null,
   notes: null,
   referenceType: null,
   referenceId: null,
   employeeId: null,
   createdAt: '2024-01-02T00:00:00.000Z',
+};
+
+/** A SALE movement as checkout posts it (negative, no reason, sale reference). */
+const saleMovement: InventoryMovement = {
+  id: 'mov-sale',
+  businessId: 'biz-1',
+  inventoryItemId: 'inv-1',
+  type: 'SALE',
+  quantity: -200,
+  unitId: 'unit-1',
+  unitCostMinor: 0,
+  reason: null,
+  notes: null,
+  referenceType: 'sale',
+  referenceId: 'sale-1',
+  employeeId: null,
+  createdAt: '2024-01-03T00:00:00.000Z',
+};
+
+/** A manual count correction; 'manual' is the stable code the history localizes. */
+const adjustmentMovement: InventoryMovement = {
+  id: 'mov-adjust',
+  businessId: 'biz-1',
+  inventoryItemId: 'inv-1',
+  type: 'ADJUSTMENT',
+  quantity: 100,
+  unitId: 'unit-1',
+  unitCostMinor: 0,
+  reason: 'manual',
+  notes: null,
+  referenceType: null,
+  referenceId: null,
+  employeeId: null,
+  createdAt: '2024-01-04T00:00:00.000Z',
+};
+
+/** An adjustment carrying an owner-typed free-text reason (shown verbatim). */
+const freeTextAdjustment: InventoryMovement = {
+  id: 'mov-adjust-note',
+  businessId: 'biz-1',
+  inventoryItemId: 'inv-1',
+  type: 'ADJUSTMENT',
+  quantity: 200,
+  unitId: 'unit-1',
+  unitCostMinor: 0,
+  reason: 'Conteo físico',
+  notes: null,
+  referenceType: null,
+  referenceId: null,
+  employeeId: null,
+  createdAt: '2024-01-05T00:00:00.000Z',
 };
 
 beforeEach(() => {
@@ -176,7 +230,6 @@ describe('InventoryDetailScreen', () => {
     expect(getByText('Movimientos recientes')).toBeTruthy();
     expect(getByText('Compra')).toBeTruthy();
     expect(getByText('+2.5 g')).toBeTruthy();
-    expect(getByText('Compra semanal')).toBeTruthy();
   });
 
   it('shows the out-of-stock badge when the count is zero', async () => {
@@ -220,5 +273,43 @@ describe('InventoryDetailScreen', () => {
       }),
     );
     await waitFor(() => expect(getByText('Existencia actualizada')).toBeTruthy());
+  });
+
+  it('records the typed adjustment reason in the ledger', async () => {
+    const { getByText, getByTestId } = await render(<InventoryDetailScreen />);
+
+    await waitFor(() => expect(getByText('Ajustar existencia')).toBeTruthy());
+    await fireEvent.changeText(getByTestId('inventory-adjust-input'), '3');
+    await fireEvent.changeText(getByTestId('inventory-adjust-reason'), 'Conteo físico');
+    await fireEvent.press(getByText('Guardar existencia'));
+
+    await waitFor(() =>
+      expect(mockAdjust).toHaveBeenCalledWith({
+        inventoryItemId: 'inv-1',
+        newQuantity: 3000,
+        reason: 'Conteo físico',
+      }),
+    );
+  });
+
+  it('reflects sales, purchases and manual adjustments in the movement history', async () => {
+    mockListMovements.mockResolvedValue({
+      items: [adjustmentMovement, freeTextAdjustment, saleMovement, movement],
+      nextCursor: null,
+    });
+    const { getAllByText, getByText } = await render(<InventoryDetailScreen />);
+
+    await waitFor(() => expect(getByText('Venta')).toBeTruthy());
+    expect(getByText('Compra')).toBeTruthy();
+    // Two manual corrections: one with the stable 'manual' code, one with a note.
+    expect(getAllByText('Ajuste')).toHaveLength(2);
+    // Signed in/out quantities (milli-units rendered against the unit symbol).
+    expect(getByText('−0.2 g')).toBeTruthy();
+    expect(getByText('+2.5 g')).toBeTruthy();
+    expect(getByText('+0.1 g')).toBeTruthy();
+    expect(getByText('+0.2 g')).toBeTruthy();
+    // The stable code is localized; an owner-typed reason renders verbatim.
+    expect(getByText('Ajuste manual')).toBeTruthy();
+    expect(getByText('Conteo físico')).toBeTruthy();
   });
 });

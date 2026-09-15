@@ -209,6 +209,9 @@ describe('POS checkout flow', () => {
     await waitFor(() => expect(getByTestId('cart-sheet')).toBeTruthy());
     await fireEvent.press(getByText('Cobrar'));
 
+    await waitFor(() => expect(getByText('Agregar método de pago')).toBeTruthy());
+    await fireEvent.press(getByText('Agregar método de pago'));
+    await fireEvent.press(getByText('Efectivo'));
     await waitFor(() => expect(getByTestId('payment-amount-pm-cash')).toBeTruthy());
     await fireEvent.changeText(getByTestId('payment-amount-pm-cash'), '12.50');
     await fireEvent.press(getByText('Confirmar cobro'));
@@ -243,10 +246,12 @@ describe('POS checkout flow', () => {
 describe('POS held-cart flow', () => {
   it('holds the active cart and resumes it from the held list', async () => {
     mockCreateHeldSale.mockResolvedValue(heldSale);
-    mockListSales.mockResolvedValue({ items: [heldSale], nextCursor: null });
+    mockListSales
+      .mockResolvedValueOnce({ items: [], nextCursor: null })
+      .mockResolvedValue({ items: [heldSale], nextCursor: null });
     mockGetSaleById.mockResolvedValue(heldDetail);
 
-    const { getByTestId, getByText } = await render(<PosScreen />);
+    const { getByTestId, getByText, queryByTestId } = await render(<PosScreen />);
 
     await waitFor(() => expect(getByText('Matcha Latte')).toBeTruthy());
     await fireEvent.press(getByTestId('product-card-p1'));
@@ -257,7 +262,12 @@ describe('POS held-cart flow', () => {
     await fireEvent.press(getByText('Poner en espera'));
     await waitFor(() => expect(mockCreateHeldSale).toHaveBeenCalled());
 
-    await fireEvent.press(getByTestId('cart-panel-held'));
+    // The cart closes and the held counter appears with a change pulse.
+    await waitFor(() => expect(queryByTestId('cart-sheet')).toBeNull());
+    await waitFor(() => expect(getByTestId('pos-held-button')).toBeTruthy());
+    expect(getByTestId('pos-held-pulse')).toBeTruthy();
+
+    await fireEvent.press(getByTestId('pos-held-button'));
     await waitFor(() => expect(getByTestId('held-sale-sale-1')).toBeTruthy());
     await fireEvent.press(getByTestId('held-sale-sale-1'));
 

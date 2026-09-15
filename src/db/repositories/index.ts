@@ -52,10 +52,13 @@ export {
   computeRecipeConsumptionMilli,
   computeRecipeCostMinor,
   computeTaxMinor,
+  getStockStatus,
   scaleQuantityByCount,
   sumMinor,
   weightedAverageUnitCostMinor,
+  STOCK_STATUSES,
 } from '@/db/repositories/calc';
+export type { StockStatus } from '@/db/repositories/calc';
 
 // Business scope.
 export { getBusinessId, resetBusinessIdForTesting } from '@/db/repositories/business-scope';
@@ -211,6 +214,7 @@ export type {
 export {
   adjustQuantity,
   listMovements,
+  MANUAL_ADJUSTMENT_REASON,
   reconcileItemFromLedger,
   recordMovement,
   recordMovementWithTxn,
