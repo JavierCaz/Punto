@@ -254,6 +254,7 @@ export {
   createHeldSale,
   expireStaleHeldSales,
   getSaleById,
+  getSalesTotals,
   HELD_SALE_TTL_HOURS,
   listSales,
   refundSale,
@@ -268,6 +269,7 @@ export type {
   SaleFilter,
   SaleItem,
   SaleItemInput,
+  SalesTotals,
 } from '@/db/repositories/sale';
 
 // Finance (expenses / non-sale income).
@@ -306,5 +308,6 @@ export {
 export type {
   CompletedSalePoint,
   PeriodTotals,
+  SaleRange,
   TopProduct,
 } from '@/db/repositories/analytics';

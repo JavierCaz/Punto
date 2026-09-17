@@ -260,6 +260,12 @@ export interface SaleFilter extends PageQuery {
   paymentMethodId?: string;
 }
 
+/** Aggregate result for a sale filter (drives the history summary line). */
+export interface SalesTotals {
+  count: number;
+  totalMinor: MoneyMinor;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -1106,4 +1112,54 @@ export async function listSales(filter: SaleFilter = {}): Promise<Page<Sale>> {
     rows.length === limit && last ? encodeCursor(last.createdAt, last.id) : null;
 
   return { items, nextCursor };
+}
+
+/**
+ * Aggregate count + total for a sale filter — the "N sales · $X" summary on
+ * the Sales History screen. Shares `listSales`' predicates so the summary can
+ * never drift from the listed rows, but ignores the cursor/pagination.
+ *
+ * With no explicit `status`, only real sales count (COMPLETED + REFUNDED): a
+ * HELD/CANCELLED cart never contributed revenue. An explicit `status`
+ * (including HELD/CANCELLED) overrides that default.
+ */
+export async function getSalesTotals(filter: SaleFilter = {}): Promise<SalesTotals> {
+  const db = await getDb();
+  const businessId = await getBusinessId();
+
+  const clauses: string[] = ['business_id = ?'];
+  const params: SqlValue[] = [businessId];
+
+  if (filter.status !== undefined) {
+    clauses.push('status = ?');
+    params.push(filter.status);
+  } else {
+    clauses.push("status IN ('COMPLETED', 'REFUNDED')");
+  }
+  if (filter.employeeId !== undefined) {
+    clauses.push('employee_id = ?');
+    params.push(filter.employeeId);
+  }
+  if (filter.paymentMethodId !== undefined) {
+    clauses.push(
+      'EXISTS (SELECT 1 FROM payment p WHERE p.sale_id = sale.id AND p.payment_method_id = ?)',
+    );
+    params.push(filter.paymentMethodId);
+  }
+  if (filter.from !== undefined) {
+    clauses.push('created_at >= ?');
+    params.push(filter.from);
+  }
+  if (filter.to !== undefined) {
+    clauses.push('created_at <= ?');
+    params.push(filter.to);
+  }
+
+  const row = await db.getFirstAsync<Record<string, unknown>>(
+    `SELECT COUNT(*) AS sale_count, COALESCE(SUM(total_minor), 0) AS sale_total
+       FROM sale
+      WHERE ${clauses.join(' AND ')}`,
+    ...params,
+  );
+  return { count: int(row?.sale_count), totalMinor: int(row?.sale_total) };
 }

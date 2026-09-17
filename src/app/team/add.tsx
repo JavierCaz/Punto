@@ -1,100 +1,23 @@
 import { Redirect, router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  StyleSheet,
-  TextInput,
-  View,
-  type KeyboardTypeOptions,
-  type TextInputProps,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { createEmployee, useAuthStore } from '@/auth';
 import { normalizeUsername, validatePin, validateUsername } from '@/auth/validation';
+import { FormField } from '@/components/form-field';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
-import { Radius, Spacing, Typography } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { hashSecret } from '@/lib/hash';
 
 type ErrorKey = 'firstName' | 'lastName' | 'username' | 'pin' | 'confirmPin' | 'form';
 
 type FormErrors = Partial<Record<ErrorKey, string>>;
-
-type FormFieldProps = {
-  label: string;
-  accessibilityLabel: string;
-  placeholder: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  hint?: string;
-  error?: string;
-  secureTextEntry?: boolean;
-  keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: NonNullable<TextInputProps['autoCapitalize']>;
-  autoCorrect?: boolean;
-  autoComplete?: NonNullable<TextInputProps['autoComplete']>;
-  maxLength?: number;
-};
-
-function FormField({
-  label,
-  accessibilityLabel,
-  placeholder,
-  value,
-  onChangeText,
-  hint,
-  error,
-  secureTextEntry = false,
-  keyboardType = 'default',
-  autoCapitalize = 'none',
-  autoCorrect = true,
-  autoComplete,
-  maxLength,
-}: FormFieldProps) {
-  const theme = useTheme();
-  const [focused, setFocused] = useState(false);
-
-  const helper = error ?? hint;
-
-  return (
-    <View style={styles.field}>
-      <ThemedText type="body2" themeColor="textSecondary">
-        {label}
-      </ThemedText>
-      <View
-        style={[
-          styles.inputBox,
-          { backgroundColor: theme.background, borderColor: focused ? theme.primary : theme.border },
-        ]}>
-        <TextInput
-          style={[styles.input, { color: theme.text }]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={theme.textSecondary}
-          accessibilityLabel={accessibilityLabel}
-          secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={autoCorrect}
-          autoComplete={autoComplete}
-          maxLength={maxLength}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-        />
-      </View>
-      {helper ? (
-        <ThemedText type="body2" themeColor={error ? 'danger' : 'textSecondary'}>
-          {helper}
-        </ThemedText>
-      ) : null}
-    </View>
-  );
-}
 
 export default function AddEmployeeScreen() {
   const { t } = useTranslation();
@@ -297,21 +220,6 @@ const styles = StyleSheet.create({
   cardBody: {
     padding: Spacing.three,
     gap: Spacing.three,
-  },
-  field: {
-    gap: Spacing.two,
-  },
-  inputBox: {
-    minHeight: 48,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    justifyContent: 'center',
-  },
-  input: {
-    fontSize: Typography.body1.fontSize,
-    lineHeight: Typography.body1.lineHeight,
-    paddingVertical: 0,
   },
   formError: {
     textAlign: 'center',

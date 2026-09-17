@@ -3,9 +3,10 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import SalesScreen from '@/app/(tabs)/sales';
 import { listActiveEmployees } from '@/auth';
 import type { PublicEmployee } from '@/auth';
-import { getBusinessProfile, listPaymentMethods, listSales } from '@/db';
+import { getBusinessProfile, getSalesTotals, listPaymentMethods, listSales } from '@/db';
 import type { PaymentMethod, Sale } from '@/db';
 import { i18n } from '@/i18n';
+import { formatMoney } from '@/i18n/format';
 
 const mockPush = jest.fn();
 
@@ -24,6 +25,7 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/db', () => ({
   getBusinessProfile: jest.fn(),
+  getSalesTotals: jest.fn(),
   listSales: jest.fn(),
   listPaymentMethods: jest.fn(),
 }));
@@ -99,6 +101,7 @@ const employee = (overrides: Partial<PublicEmployee> = {}): PublicEmployee => ({
 });
 
 const mockListSales = listSales as jest.MockedFunction<typeof listSales>;
+const mockGetSalesTotals = getSalesTotals as jest.MockedFunction<typeof getSalesTotals>;
 const mockGetProfile = getBusinessProfile as jest.MockedFunction<typeof getBusinessProfile>;
 const mockListPaymentMethods = listPaymentMethods as jest.MockedFunction<typeof listPaymentMethods>;
 const mockListEmployees = listActiveEmployees as jest.MockedFunction<typeof listActiveEmployees>;
@@ -112,6 +115,7 @@ beforeEach(() => {
     items: [sale(), sale({ id: 'sale-2', saleNumber: 'S-000002', status: 'REFUNDED' })],
     nextCursor: null,
   });
+  mockGetSalesTotals.mockResolvedValue({ count: 2, totalMinor: 2500 });
   mockListPaymentMethods.mockResolvedValue([paymentMethod()]);
   mockListEmployees.mockResolvedValue([employee()]);
 });
@@ -177,6 +181,34 @@ describe('SalesScreen', () => {
       expect(mockListSales).toHaveBeenCalledWith(
         expect.objectContaining({ paymentMethodId: 'pm-cash' }),
       ),
+    );
+  });
+
+  it('shows the filtered sales count and total summary', async () => {
+    const { getByTestId, getByText } = await render(<SalesScreen />);
+
+    await waitFor(() => expect(getByTestId('sales-summary-total')).toBeTruthy());
+    expect(getByText('2 ventas')).toBeTruthy();
+    expect(getByTestId('sales-summary-total').props.children).toBe(formatMoney(2500, 'MXN'));
+  });
+
+  it('filters both the list and the summary by employee', async () => {
+    const { getByTestId, getByText } = await render(<SalesScreen />);
+
+    await waitFor(() => expect(mockListSales).toHaveBeenCalledWith({}));
+
+    await fireEvent.press(getByTestId('sales-employee-trigger'));
+    expect(getByText('Ana López')).toBeTruthy();
+
+    await fireEvent.press(getByTestId('sales-employee-emp-1'));
+
+    await waitFor(() =>
+      expect(mockListSales).toHaveBeenCalledWith(
+        expect.objectContaining({ employeeId: 'emp-1' }),
+      ),
+    );
+    expect(mockGetSalesTotals).toHaveBeenCalledWith(
+      expect.objectContaining({ employeeId: 'emp-1' }),
     );
   });
 });

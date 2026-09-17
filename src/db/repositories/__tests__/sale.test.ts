@@ -19,6 +19,7 @@ import {
   createHeldSale,
   expireStaleHeldSales,
   getSaleById,
+  getSalesTotals,
   listSales,
   refundSale,
   removeSaleItem,
@@ -861,5 +862,54 @@ describe('checkoutSale', () => {
     expect(result.totalMinor).toBe(500);
     expect(result.items).toHaveLength(1);
     expect(result.payments).toHaveLength(1);
+  });
+
+  describe('getSalesTotals', () => {
+    it('defaults to real sales (COMPLETED + REFUNDED) and sums them', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('AS sale_count', { sale_count: 3, sale_total: 15000 });
+
+      const result = await getSalesTotals();
+
+      expect(result).toEqual({ count: 3, totalMinor: 15000 });
+      const call = adapter.calls.find((c) => c.sql.includes('AS sale_count'));
+      expect(call?.sql).toContain("status IN ('COMPLETED', 'REFUNDED')");
+      expect(call?.params).toEqual(['biz-1']);
+    });
+
+    it('applies status/employee/method/date filters with bound params', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('AS sale_count', { sale_count: 1, sale_total: 1250 });
+
+      await getSalesTotals({
+        status: 'REFUNDED',
+        employeeId: 'emp-2',
+        paymentMethodId: 'pm-cash',
+        from: '2026-09-01T00:00:00.000Z',
+        to: '2026-09-30T23:59:59.999Z',
+      });
+
+      const call = adapter.calls.find((c) => c.sql.includes('AS sale_count'));
+      expect(call?.sql).toContain('status = ?');
+      expect(call?.sql).toContain('employee_id = ?');
+      expect(call?.sql).toContain('EXISTS (SELECT 1 FROM payment p');
+      expect(call?.sql).toContain('created_at >= ?');
+      expect(call?.sql).toContain('created_at <= ?');
+      expect(call?.params).toEqual([
+        'biz-1',
+        'REFUNDED',
+        'emp-2',
+        'pm-cash',
+        '2026-09-01T00:00:00.000Z',
+        '2026-09-30T23:59:59.999Z',
+      ]);
+    });
+
+    it('coerces a null aggregate to 0', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('AS sale_count', { sale_count: null, sale_total: null });
+
+      await expect(getSalesTotals()).resolves.toEqual({ count: 0, totalMinor: 0 });
+    });
   });
 });

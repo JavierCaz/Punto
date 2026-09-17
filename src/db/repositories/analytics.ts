@@ -1,6 +1,7 @@
 import { getDb } from '@/db/client';
 
 import { getBusinessId } from '@/db/repositories/business-scope';
+import type { SqlValue } from '@/db/repositories/database';
 import { int, str } from '@/db/repositories/mappers';
 import type { MoneyMinor, QuantityMilli, TimestampIso } from '@/db/repositories/types';
 
@@ -26,6 +27,8 @@ import type { MoneyMinor, QuantityMilli, TimestampIso } from '@/db/repositories/
  *
  * Every query is scoped `business_id = ?` and takes an inclusive ISO-8601 UTC
  * `[from, to]` range (built from the device-local day in `@/lib/dashboard`).
+ * Sale-derived aggregates also accept an optional `employeeId` to scope the
+ * Dashboard to one seller (see `SaleRange`).
  */
 
 /** A period total plus its row count. */
@@ -34,6 +37,19 @@ export interface PeriodTotals {
   count: number;
 }
 
+/**
+ * Inclusive ISO-8601 UTC range, optionally scoped to one seller. Used by the
+ * Dashboard's employee filter; `employeeId` unset means the whole business.
+ * Legacy/unassigned sales (`employee_id IS NULL`) are only counted when no
+ * employee is selected.
+ */
+export interface SaleRange {
+  from: TimestampIso;
+  to: TimestampIso;
+  employeeId?: string;
+}
+
+/** A COMPLETED sale reduced to what the income trend needs. */
 /** A COMPLETED sale reduced to what the income trend needs. */
 export interface CompletedSalePoint {
   completedAt: TimestampIso;
@@ -49,21 +65,21 @@ export interface TopProduct {
 
 
 /** Gross COMPLETED sales in the range (income basis). */
-export async function getCompletedSalesTotals(range: {
-  from: TimestampIso;
-  to: TimestampIso;
-}): Promise<PeriodTotals> {
+export async function getCompletedSalesTotals(range: SaleRange): Promise<PeriodTotals> {
   const db = await getDb();
   const businessId = await getBusinessId();
+  const params: SqlValue[] = [businessId, range.from, range.to];
+  if (range.employeeId !== undefined) {
+    params.push(range.employeeId);
+  }
+  const employeeClause = range.employeeId !== undefined ? ' AND employee_id = ?' : '';
   const row = await db.getFirstAsync<Record<string, unknown>>(
     `SELECT COALESCE(SUM(total_minor), 0) AS completed_total,
             COUNT(*) AS completed_count
        FROM sale
       WHERE business_id = ? AND status = 'COMPLETED'
-        AND completed_at >= ? AND completed_at <= ?`,
-    businessId,
-    range.from,
-    range.to,
+        AND completed_at >= ? AND completed_at <= ?${employeeClause}`,
+    ...params,
   );
   return { totalMinor: int(row?.completed_total), count: int(row?.completed_count) };
 }
@@ -72,21 +88,21 @@ export async function getCompletedSalesTotals(range: {
  * Gross value of sales REFUNDED in the range. Keyed on `refunded_at` so the
  * refund lands on the day it was issued.
  */
-export async function getRefundedSalesTotals(range: {
-  from: TimestampIso;
-  to: TimestampIso;
-}): Promise<PeriodTotals> {
+export async function getRefundedSalesTotals(range: SaleRange): Promise<PeriodTotals> {
   const db = await getDb();
   const businessId = await getBusinessId();
+  const params: SqlValue[] = [businessId, range.from, range.to];
+  if (range.employeeId !== undefined) {
+    params.push(range.employeeId);
+  }
+  const employeeClause = range.employeeId !== undefined ? ' AND employee_id = ?' : '';
   const row = await db.getFirstAsync<Record<string, unknown>>(
     `SELECT COALESCE(SUM(total_minor), 0) AS refund_total,
             COUNT(*) AS refund_count
        FROM sale
       WHERE business_id = ? AND status = 'REFUNDED'
-        AND refunded_at >= ? AND refunded_at <= ?`,
-    businessId,
-    range.from,
-    range.to,
+        AND refunded_at >= ? AND refunded_at <= ?${employeeClause}`,
+    ...params,
   );
   return { totalMinor: int(row?.refund_total), count: int(row?.refund_count) };
 }
@@ -131,21 +147,21 @@ export async function getPurchaseExpenseTotal(range: {
 }
 
 /** COMPLETED sales in the range, for local-day bucketing on the client. */
-export async function listCompletedSalesInRange(range: {
-  from: TimestampIso;
-  to: TimestampIso;
-}): Promise<CompletedSalePoint[]> {
+export async function listCompletedSalesInRange(range: SaleRange): Promise<CompletedSalePoint[]> {
   const db = await getDb();
   const businessId = await getBusinessId();
+  const params: SqlValue[] = [businessId, range.from, range.to];
+  if (range.employeeId !== undefined) {
+    params.push(range.employeeId);
+  }
+  const employeeClause = range.employeeId !== undefined ? ' AND employee_id = ?' : '';
   const rows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT completed_at, total_minor
        FROM sale
       WHERE business_id = ? AND status = 'COMPLETED'
-        AND completed_at >= ? AND completed_at <= ?
+        AND completed_at >= ? AND completed_at <= ?${employeeClause}
       ORDER BY completed_at ASC`,
-    businessId,
-    range.from,
-    range.to,
+    ...params,
   );
   return rows.map((row) => ({
     completedAt: str(row.completed_at),
@@ -155,11 +171,17 @@ export async function listCompletedSalesInRange(range: {
 
 /** Best-selling products by revenue within the range (COMPLETED sales only). */
 export async function listTopProducts(
-  range: { from: TimestampIso; to: TimestampIso },
+  range: SaleRange,
   limit = 5,
 ): Promise<TopProduct[]> {
   const db = await getDb();
   const businessId = await getBusinessId();
+  const params: SqlValue[] = [businessId, range.from, range.to];
+  if (range.employeeId !== undefined) {
+    params.push(range.employeeId);
+  }
+  const employeeClause = range.employeeId !== undefined ? ' AND s.employee_id = ?' : '';
+  params.push(limit);
   const rows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT si.product_name AS product_name,
             SUM(si.subtotal_minor) AS revenue_minor,
@@ -167,14 +189,11 @@ export async function listTopProducts(
        FROM sale_item si
        JOIN sale s ON s.id = si.sale_id
       WHERE s.business_id = ? AND s.status = 'COMPLETED'
-        AND s.completed_at >= ? AND s.completed_at <= ?
+        AND s.completed_at >= ? AND s.completed_at <= ?${employeeClause}
       GROUP BY si.product_name
       ORDER BY revenue_minor DESC, si.product_name ASC
       LIMIT ?`,
-    businessId,
-    range.from,
-    range.to,
-    limit,
+    ...params,
   );
   return rows.map((row) => ({
     name: str(row.product_name),

@@ -16,11 +16,12 @@ export {
   findActiveEmployeeById,
   getBusiness,
   listActiveEmployees,
+  updateEmployee,
   onboardBusiness,
   resolveAuthKind,
   signIn,
 } from '@/auth/auth-repository';
-export type { PublicEmployee } from '@/auth/auth-repository';
+export type { PublicEmployee, UpdateEmployeeInput } from '@/auth/auth-repository';
 export { loginLimiter } from '@/auth/lockout';
 export {
   normalizeUsername,

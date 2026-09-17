@@ -1,14 +1,16 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { listActiveEmployees, useAuthStore, type PublicEmployee } from '@/auth';
 import { IncomeTrendChart } from '@/components/charts/income-trend-chart';
 import { TopProductsChart } from '@/components/charts/top-products-chart';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
 import { SectionHeader } from '@/components/section-header';
+import { SelectField } from '@/components/select-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
@@ -73,7 +75,29 @@ function PeriodChip({
 export default function DashboardScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
-  const { model, loading, loadFailed, reload, period, setPeriod } = useDashboard();
+  const user = useAuthStore((state) => state.user);
+  const {
+    model,
+    loading,
+    loadFailed,
+    reload,
+    period,
+    setPeriod,
+    employeeId,
+    setEmployee,
+  } = useDashboard();
+
+  const isAdmin = user?.role === 'ADMIN';
+  const [employees, setEmployees] = useState<PublicEmployee[]>([]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+    void listActiveEmployees()
+      .then(setEmployees)
+      .catch(() => setEmployees([]));
+  }, [isAdmin]);
 
   useFocusEffect(
     useCallback(() => {
@@ -112,14 +136,14 @@ export default function DashboardScreen() {
   const {
     totals,
     currency,
-    salesCount,
-    averageTicketMinor,
+    report,
     trend,
     granularity,
     topProducts,
     lowStock,
     heldCount,
   } = model;
+
 
   const netColor = totals.netMinor < 0 ? theme.danger : theme.success;
 
@@ -132,6 +156,17 @@ export default function DashboardScreen() {
   ].filter((entry) => entry.amount > 0);
 
   const hasProblems = lowStock.length > 0 || heldCount > 0;
+
+  const attributedEmployee = employeeId
+    ? employees.find((employee) => employee.id === employeeId)
+    : undefined;
+  const employeeName = attributedEmployee
+    ? `${attributedEmployee.firstName}${attributedEmployee.lastName ? ` ${attributedEmployee.lastName}` : ''}`
+    : null;
+  const employeeItems = employees.map((employee) => ({
+    value: employee.id,
+    label: `${employee.firstName} ${employee.lastName ?? ''}`.trim(),
+  }));
 
   return (
     <Screen scroll underWebTabBar contentContainerStyle={styles.content}>
@@ -220,22 +255,28 @@ export default function DashboardScreen() {
         ))}
       </ScrollView>
 
+      {isAdmin ? (
+        <View style={styles.selectRow}>
+          <SelectField
+            items={employeeItems}
+            value={employeeId}
+            onChange={setEmployee}
+            label={t('dashboard.employeeFilter')}
+            noneLabel={t('dashboard.allEmployees')}
+            testIDPrefix="dashboard-employee"
+          />
+        </View>
+      ) : null}
+
       <ThemedView type="backgroundElement" style={[styles.netCard, { borderColor: theme.border }]}>
         <ThemedText type="body2" themeColor="textSecondary">
-          {`${t('dashboard.netLabel')} · ${t(PERIOD_LABEL_KEY[period])}`}
+          {`${t('dashboard.netLabel')} · ${t(PERIOD_LABEL_KEY[period])}${
+            employeeId ? ` · ${t('dashboard.businessWide')}` : ''
+          }`}
         </ThemedText>
         <ThemedText type="display" testID="dashboard-net" style={{ color: netColor }}>
           {formatMoney(totals.netMinor, currency)}
         </ThemedText>
-
-        <View style={styles.netMeta}>
-          <ThemedText type="body2" themeColor="textSecondary">
-            {t('dashboard.salesCount', { count: salesCount })}
-          </ThemedText>
-          <ThemedText type="body2" themeColor="textSecondary">
-            {t('dashboard.averageTicket')}: {formatMoney(averageTicketMinor, currency)}
-          </ThemedText>
-        </View>
 
         {breakdown.length > 0 ? (
           <View style={[styles.breakdown, { borderTopColor: theme.border }]}>
@@ -255,6 +296,31 @@ export default function DashboardScreen() {
           </View>
         ) : null}
       </ThemedView>
+
+      <View style={styles.section}>
+        <SectionHeader level="section" title={t('dashboard.salesSectionTitle')} />
+        <ThemedView
+          type="backgroundElement"
+          style={[styles.reportCard, { borderColor: theme.border }]}>
+          <ThemedText type="body2" themeColor="textSecondary" testID="dashboard-report-scope">
+            {employeeName ?? t('dashboard.allEmployees')}
+          </ThemedText>
+          <View style={styles.reportMeta}>
+            <ThemedText type="body2" themeColor="textSecondary">
+              {t('dashboard.salesCount', { count: report.salesCount })}
+            </ThemedText>
+            <ThemedText type="body2" themeColor="textSecondary">
+              {t('dashboard.averageTicket')}: {formatMoney(report.averageTicketMinor, currency)}
+            </ThemedText>
+          </View>
+          <View style={styles.reportTotalRow}>
+            <ThemedText type="body1">{t('dashboard.salesTotalLabel')}</ThemedText>
+            <ThemedText type="code" testID="dashboard-report-total">
+              {formatMoney(report.salesMinor, currency)}
+            </ThemedText>
+          </View>
+        </ThemedView>
+      </View>
 
       <View style={styles.section}>
         <SectionHeader level="section" title={t('dashboard.trendTitle')} />
@@ -320,6 +386,26 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
+  },
+  selectRow: {
+    gap: Spacing.two,
+  },
+  reportCard: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  reportMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+  },
+  reportTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
   },
   netCard: {
     borderRadius: Radius.lg,

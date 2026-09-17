@@ -14,12 +14,14 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Spacing, TouchTarget } from '@/constants/theme';
 import {
   getBusinessProfile,
+  getSalesTotals,
   listPaymentMethods,
   listSales,
   type PaymentMethod,
   type Sale,
   type SaleFilter,
   type SaleStatus,
+  type SalesTotals,
 } from '@/db';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateTime, formatMoney } from '@/i18n/format';
@@ -92,6 +94,7 @@ export default function SalesScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [summary, setSummary] = useState<SalesTotals | null>(null);
 
   useEffect(() => {
     void getBusinessProfile()
@@ -137,9 +140,11 @@ export default function SalesScreen() {
     setLoading(true);
     setLoadFailed(false);
     try {
-      const page = await listSales(buildFilter());
+      const filter = buildFilter();
+      const [page, totals] = await Promise.all([listSales(filter), getSalesTotals(filter)]);
       setSales(page.items);
       setCursor(page.nextCursor);
+      setSummary(totals);
     } catch {
       setLoadFailed(true);
     } finally {
@@ -329,6 +334,21 @@ export default function SalesScreen() {
         </View>
       </View>
 
+      {summary && !loading ? (
+        <View
+          style={[
+            styles.summary,
+            { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+          ]}>
+          <ThemedText type="body2" themeColor="textSecondary">
+            {t('sales.summaryCount', { count: summary.count })}
+          </ThemedText>
+          <ThemedText type="code" testID="sales-summary-total">
+            {formatMoney(summary.totalMinor, currency)}
+          </ThemedText>
+        </View>
+      ) : null}
+
       {renderBody()}
     </Screen>
   );
@@ -347,6 +367,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  summary: {
+    minHeight: TouchTarget.min,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
   },
   chip: {
     minHeight: 36,

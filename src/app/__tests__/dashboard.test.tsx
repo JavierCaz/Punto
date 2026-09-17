@@ -11,6 +11,7 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import DashboardScreen from '@/app/(tabs)/index';
+import { listActiveEmployees, type PublicEmployee } from '@/auth';
 import {
   countHeldSales,
   expireStaleHeldSales,
@@ -56,6 +57,14 @@ jest.mock('@/db', () => ({
   countHeldSales: jest.fn(),
   expireStaleHeldSales: jest.fn(),
   HELD_SALE_TTL_HOURS: 24,
+}));
+
+// The dashboard shows the employee filter only for an ADMIN; report scoping is
+// driven by the selected employee id.
+jest.mock('@/auth', () => ({
+  listActiveEmployees: jest.fn(),
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({ user: { id: 'emp-1', firstName: 'Ana', lastName: 'López', role: 'ADMIN' } }),
 }));
 
 // victory-native + Skia are native; the charts are not under test here.
@@ -119,6 +128,19 @@ const mockLowStock = listLowStockItems as jest.MockedFunction<typeof listLowStoc
 const mockHeld = countHeldSales as jest.MockedFunction<typeof countHeldSales>;
 const mockExpireHeld = expireStaleHeldSales as jest.MockedFunction<typeof expireStaleHeldSales>;
 const mockProfile = getBusinessProfile as jest.MockedFunction<typeof getBusinessProfile>;
+const mockListEmployees = listActiveEmployees as jest.MockedFunction<typeof listActiveEmployees>;
+
+const employee = (overrides: Partial<PublicEmployee> = {}): PublicEmployee => ({
+  id: 'emp-1',
+  businessId: 'biz-1',
+  firstName: 'Ana',
+  lastName: 'López',
+  username: 'ana',
+  role: 'ADMIN',
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
 
 /** Mixed day: 1000.00 sales, 200.00 refund, 150.00 manual expense, 300.00 purchase, 50.00 other income. */
 const NET_MINOR = 100000 + 5000 - 20000 - 15000 - 30000; // 40000
@@ -143,6 +165,7 @@ beforeEach(() => {
   mockProfile.mockResolvedValue({ currencyCode: 'MXN' } as Awaited<
     ReturnType<typeof getBusinessProfile>
   >);
+  mockListEmployees.mockResolvedValue([employee()]);
 });
 
 afterEach(async () => {
@@ -221,5 +244,38 @@ describe('DashboardScreen', () => {
       expect.objectContaining({ from: periodRange('month').from }),
     );
     expect(getByText('Flujo neto · Mes')).toBeTruthy();
+  });
+
+  it('scopes the sales report to the selected employee while net stays business-wide', async () => {
+    mockCompletedTotals.mockImplementation(async (range) =>
+      range.employeeId
+        ? { totalMinor: 30000, count: 1 }
+        : { totalMinor: 100000, count: 2 },
+    );
+
+    const { getByTestId, getByText } = await render(<DashboardScreen />);
+
+    await waitFor(() => expect(getByTestId('dashboard-net')).toBeTruthy());
+
+    await fireEvent.press(getByTestId('dashboard-employee-trigger'));
+    await fireEvent.press(getByTestId('dashboard-employee-emp-1'));
+
+    await waitFor(() =>
+      expect(mockCompletedTotals).toHaveBeenCalledWith(
+        expect.objectContaining({ employeeId: 'emp-1' }),
+      ),
+    );
+
+    // The sales report follows the employee…
+    await waitFor(() =>
+      expect(getByTestId('dashboard-report-total').props.children).toBe(
+        formatMoney(30000, 'MXN'),
+      ),
+    );
+    expect(getByTestId('dashboard-report-scope').props.children).toBe('Ana López');
+
+    // …while net cash flow stays the business-wide figure and is labelled so.
+    expect(getByTestId('dashboard-net').props.children).toBe(formatMoney(NET_MINOR, 'MXN'));
+    expect(getByText('Flujo neto · Hoy · Negocio')).toBeTruthy();
   });
 });

@@ -135,4 +135,48 @@ describe('analytics repository', () => {
     const call = adapter.calls.find((c) => c.sql.includes('AS held_count'));
     expect(call!.sql).toContain("status = 'HELD'");
   });
+
+  it('getCompletedSalesTotals scopes to a seller when employeeId is set', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueFirst('AS completed_total', { completed_total: 5000, completed_count: 1 });
+
+    await getCompletedSalesTotals({ ...RANGE, employeeId: 'emp-2' });
+
+    const call = adapter.calls.find((c) => c.sql.includes('AS completed_total'));
+    expect(call!.sql).toContain('AND employee_id = ?');
+    expect(call!.params).toEqual(['biz-1', RANGE.from, RANGE.to, 'emp-2']);
+  });
+
+  it('getRefundedSalesTotals scopes refunds to the original seller', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueFirst('AS refund_total', { refund_total: 2000, refund_count: 1 });
+
+    await getRefundedSalesTotals({ ...RANGE, employeeId: 'emp-2' });
+
+    const call = adapter.calls.find((c) => c.sql.includes('AS refund_total'));
+    expect(call!.sql).toContain('AND employee_id = ?');
+    expect(call!.params).toEqual(['biz-1', RANGE.from, RANGE.to, 'emp-2']);
+  });
+
+  it('listCompletedSalesInRange scopes the trend to a seller', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('SELECT completed_at, total_minor', []);
+
+    await listCompletedSalesInRange({ ...RANGE, employeeId: 'emp-2' });
+
+    const call = adapter.calls.find((c) => c.sql.includes('SELECT completed_at, total_minor'));
+    expect(call!.sql).toContain('AND employee_id = ?');
+    expect(call!.params).toEqual(['biz-1', RANGE.from, RANGE.to, 'emp-2']);
+  });
+
+  it('listTopProducts scopes to a seller and keeps the limit bound last', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('AS revenue_minor', []);
+
+    await listTopProducts({ ...RANGE, employeeId: 'emp-2' }, 5);
+
+    const call = adapter.calls.find((c) => c.sql.includes('AS revenue_minor'));
+    expect(call!.sql).toContain('AND s.employee_id = ?');
+    expect(call!.params).toEqual(['biz-1', RANGE.from, RANGE.to, 'emp-2', 5]);
+  });
 });

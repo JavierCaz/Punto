@@ -212,36 +212,45 @@ export default function TeamScreen() {
                     <View style={[styles.divider, { backgroundColor: theme.border }]} />
                   ) : null}
                   <View style={styles.row}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={fullName(employee)}
+                      testID={`team-member-${employee.id}`}
+                      onPress={() =>
+                        router.push({ pathname: '/team/[id]', params: { id: employee.id } })
+                      }
+                      style={({ pressed }) => [styles.rowMain, pressed && styles.rowMainPressed]}>
                     <View style={[styles.avatarTile, { backgroundColor: theme.backgroundSelected }]}>
-                      <MaterialCommunityIcons name="account" size={22} color={theme.primary} />
-                    </View>
+                        <MaterialCommunityIcons name="account" size={22} color={theme.primary} />
+                      </View>
 
-                    <View style={styles.rowTitles}>
-                      <View style={styles.nameRow}>
-                        <ThemedText type="body1" numberOfLines={1} style={styles.name}>
-                          {fullName(employee)}
-                        </ThemedText>
-                        {isSelf ? (
-                          <ThemedText type="body2" themeColor="textSecondary">
-                            {t('team.currentUserSuffix')}
+                      <View style={styles.rowTitles}>
+                        <View style={styles.nameRow}>
+                          <ThemedText type="body1" numberOfLines={1} style={styles.name}>
+                            {fullName(employee)}
                           </ThemedText>
-                        ) : null}
-                      </View>
+                          {isSelf ? (
+                            <ThemedText type="body2" themeColor="textSecondary">
+                              {t('team.currentUserSuffix')}
+                            </ThemedText>
+                          ) : null}
+                        </View>
 
-                      <View style={styles.metaRow}>
-                        <ThemedText
-                          type="body2"
-                          themeColor="textSecondary"
-                          numberOfLines={1}
-                          style={styles.username}>
-                          {employee.username}
-                        </ThemedText>
-                        <RoleBadge
-                          role={employee.role}
-                          label={employee.role === 'ADMIN' ? t('roles.admin') : t('roles.employee')}
-                        />
+                        <View style={styles.metaRow}>
+                          <ThemedText
+                            type="body2"
+                            themeColor="textSecondary"
+                            numberOfLines={1}
+                            style={styles.username}>
+                            {employee.username}
+                          </ThemedText>
+                          <RoleBadge
+                            role={employee.role}
+                            label={employee.role === 'ADMIN' ? t('roles.admin') : t('roles.employee')}
+                          />
+                        </View>
                       </View>
-                    </View>
+                    </Pressable>
 
                     {canArchive ? (
                       <Pressable
@@ -309,6 +318,15 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+  },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  rowMainPressed: {
+    opacity: 0.7,
   },
   avatarTile: {
     width: 44,

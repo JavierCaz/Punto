@@ -3,7 +3,7 @@ import * as Crypto from 'expo-crypto';
 import { loginLimiter } from '@/auth/lockout';
 import { normalizeUsername, isAuthRole } from '@/auth/validation';
 import type { AuthRole } from '@/auth/types';
-import { getDb, withTransaction } from '@/db';
+import { buildUpdateAssignments, getDb, withTransaction } from '@/db';
 import { verifySecret, needsRehash, hashSecret } from '@/lib/hash';
 
 /**
@@ -317,6 +317,92 @@ export async function createEmployee(input: {
     );
     return toPublicEmployee(mapEmployeeRow(row as Record<string, unknown>));
   });
+}
+
+/**
+ * Update an employee's profile and (optionally) reset their PIN. Admin-only
+ * action enforced at the screen; the repository owns the data invariants:
+ * - the target must exist and not be archived;
+ * - `username` stays unique among live rows (excluding the row itself);
+ * - a PIN can only be set on an EMPLOYEE row — ADMIN signs in with a password.
+ *
+ * `username` is required: clearing it on a credentialed row would silently
+ * disable that person's login, so a legacy attribution-only row must be given
+ * one before it can be saved.
+ *
+ * Only the fields present in `input` change; `pinHash` omitted means the
+ * credential is left untouched.
+ */
+export async function updateEmployee(
+  targetEmployeeId: string,
+  input: UpdateEmployeeInput,
+): Promise<ReturnType<typeof toPublicEmployee>> {
+  const username = normalizeUsername(input.username);
+  const firstName = input.firstName.trim();
+  if (firstName.length === 0) {
+    throw new Error('AUTH_FIRST_NAME_REQUIRED');
+  }
+
+  return withTransaction(async (txn) => {
+    const target = await txn.getFirstAsync<Record<string, unknown>>(
+      `SELECT ${EMPLOYEE_COLUMNS} FROM employee
+        WHERE id = ? AND archived_at IS NULL LIMIT 1`,
+      targetEmployeeId,
+    );
+    if (!target) {
+      throw new Error('AUTH_EMPLOYEE_NOT_FOUND');
+    }
+    const employee = mapEmployeeRow(target);
+
+    if (input.pinHash !== undefined && employee.role !== 'EMPLOYEE') {
+      throw new Error('AUTH_PIN_NOT_ALLOWED');
+    }
+
+    const clash = await txn.getFirstAsync<{ id: string }>(
+      `SELECT id FROM employee
+        WHERE username = ? AND archived_at IS NULL AND id != ? LIMIT 1`,
+      username,
+      targetEmployeeId,
+    );
+    if (clash) {
+      throw new Error('AUTH_USERNAME_TAKEN');
+    }
+
+    const { assignments, params } = buildUpdateAssignments({
+      first_name: firstName,
+      last_name: input.lastName === undefined ? undefined : input.lastName?.trim() || null,
+      username,
+      pin_hash: input.pinHash,
+    });
+    // Always bump updated_at (a bare timestamp bump is a valid no-op update).
+    assignments.push('updated_at = ?');
+    params.push(nowIso());
+
+    await txn.runAsync(
+      `UPDATE employee SET ${assignments.join(', ')} WHERE id = ?`,
+      ...params,
+      targetEmployeeId,
+    );
+
+    const row = await txn.getFirstAsync<Record<string, unknown>>(
+      `SELECT ${EMPLOYEE_COLUMNS} FROM employee WHERE id = ?`,
+      targetEmployeeId,
+    );
+    if (!row) {
+      throw new Error('AUTH_EMPLOYEE_NOT_FOUND');
+    }
+    return toPublicEmployee(mapEmployeeRow(row));
+  });
+}
+
+/** Patch accepted by {@link updateEmployee}. */
+export interface UpdateEmployeeInput {
+  firstName: string;
+  /** `undefined` leaves the stored last name unchanged; `null`/empty clears it. */
+  lastName?: string | null;
+  username: string;
+  /** New PIN hash (EMPLOYEE only). Omit to keep the current credential. */
+  pinHash?: string;
 }
 
 /**
