@@ -6,7 +6,11 @@ import type { MaterialIconName } from './empty-state';
 
 import { Radius, Spacing, TouchTarget, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { pickReadableForeground } from '@/lib/contrast';
 
+
+/** Emphasis of the button fill. */
+export type PrimaryButtonTone = 'primary' | 'danger';
 
 export type PrimaryButtonProps = {
   label: string;
@@ -16,11 +20,23 @@ export type PrimaryButtonProps = {
   style?: StyleProp<ViewStyle>;
   /** Test id forwarded to the pressable (for component tests). */
   testID?: string;
+  /** Button fill emphasis. Defaults to 'primary'. */
+  tone?: PrimaryButtonTone;
 };
 
 /** High-emphasis action button (theme.primary fill, radius-md, ≥ TouchTarget.min). */
-export function PrimaryButton({ label, onPress, icon, disabled = false, style, testID }: PrimaryButtonProps) {
+export function PrimaryButton({
+  label,
+  onPress,
+  icon,
+  disabled = false,
+  style,
+  testID,
+  tone = 'primary',
+}: PrimaryButtonProps) {
   const theme = useTheme();
+  const background = tone === 'danger' ? theme.danger : theme.primary;
+  const foreground = tone === 'danger' ? pickReadableForeground(theme.danger) : theme.onPrimary;
 
   return (
     <Pressable
@@ -30,14 +46,14 @@ export function PrimaryButton({ label, onPress, icon, disabled = false, style, t
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: theme.primary },
+        { backgroundColor: background },
         pressed && !disabled && styles.pressed,
         disabled && styles.disabled,
         style,
       ]}>
       <View style={styles.inner}>
-        {icon ? <MaterialCommunityIcons name={icon} size={20} color={theme.onPrimary} /> : null}
-        <ThemedText style={[styles.label, { color: theme.onPrimary }]}>{label}</ThemedText>
+        {icon ? <MaterialCommunityIcons name={icon} size={20} color={foreground} /> : null}
+        <ThemedText style={[styles.label, { color: foreground }]}>{label}</ThemedText>
       </View>
     </Pressable>
   );

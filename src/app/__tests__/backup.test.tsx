@@ -4,13 +4,14 @@
  * The native file/clipboard flows, expo-router, expo-constants and the '@/db'
  * data layer are mocked so the screen renders offline without SQLite. The pure
  * backup-format helpers (parse / summarize / build) are the real shipped code.
+ * Dialogs render through the real <DialogHost /> (custom in-app alerts).
  */
 
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import BackupScreen from '@/app/backup';
 import { clearAllData, exportDatabase, importDatabase, inspectBackup, isDatabaseEmpty } from '@/db';
+import { DialogHost, dismissDialog } from '@/dialog';
 import { i18n } from '@/i18n';
 import * as backupFiles from '@/lib/backup-files';
 import {
@@ -87,9 +88,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-type AlertButton = { style?: string; onPress?: () => void };
-type AlertCall = [string, string, AlertButton[] | undefined];
-
 function makeDocument(counts: {
   product?: number;
   sale?: number;
@@ -111,11 +109,18 @@ function makeDocument(counts: {
   });
 }
 
-let alertSpy: jest.SpyInstance;
+function renderBackup() {
+  return render(
+    <>
+      <BackupScreen />
+      <DialogHost />
+    </>,
+  );
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
-  alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  dismissDialog();
   jest.mocked(exportDatabase).mockResolvedValue(makeDocument({}));
   jest.mocked(isDatabaseEmpty).mockResolvedValue(false);
   jest.mocked(backupFiles.backupSharingAvailable).mockResolvedValue(true);
@@ -123,18 +128,11 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  alertSpy.mockRestore();
+  dismissDialog();
   if (i18n.language !== 'es') {
     await i18n.changeLanguage('es');
   }
 });
-
-function findConfirmButton(title: string): AlertButton | undefined {
-  const calls = alertSpy.mock.calls as AlertCall[];
-  return calls
-    .find(([callTitle]) => callTitle === title)?.[2]
-    ?.find((button) => button.style === 'destructive');
-}
 
 describe('BackupScreen', () => {
   it('renders the sections and dataset summary in Spanish', async () => {
@@ -142,7 +140,7 @@ describe('BackupScreen', () => {
       .mocked(exportDatabase)
       .mockResolvedValue(makeDocument({ product: 2, sale: 1, inventory_item: 1 }));
 
-    const { getByText, getByTestId } = await render(<BackupScreen />);
+    const { getByText, getByTestId } = await renderBackup();
 
     expect(getByText('Estado de los datos')).toBeTruthy();
     expect(getByText('Exportar')).toBeTruthy();
@@ -163,7 +161,7 @@ describe('BackupScreen', () => {
       .mocked(exportDatabase)
       .mockResolvedValue(makeDocument({ product: 1, sale: 2, inventory_item: 0 }));
 
-    const { getByText } = await render(<BackupScreen />);
+    const { getByText } = await renderBackup();
 
     expect(getByText('Data status')).toBeTruthy();
     expect(getByText('Export')).toBeTruthy();
@@ -173,15 +171,15 @@ describe('BackupScreen', () => {
     await waitFor(() => expect(getByText('3 records in total')).toBeTruthy());
   });
 
-  it('exports by writing a file and opening the share sheet', async () => {
-    const { getByTestId } = await render(<BackupScreen />);
+  it('exports by writing a file and shows the success dialog', async () => {
+    const { getByTestId, getByText } = await renderBackup();
 
     await fireEvent.press(getByTestId('backup-export-button'));
 
     await waitFor(() => expect(backupFiles.writeBackupFile).toHaveBeenCalledTimes(1));
     expect(backupFiles.shareBackupFile).toHaveBeenCalledTimes(1);
     expect(backupFiles.copyBackupToClipboard).not.toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledWith('Copia exportada', expect.any(String));
+    await waitFor(() => expect(getByText('Copia exportada')).toBeTruthy());
   });
 
   it('imports a valid backup after the destructive confirmation', async () => {
@@ -194,23 +192,12 @@ describe('BackupScreen', () => {
       .mocked(inspectBackup)
       .mockResolvedValue({ ok: true, document, stats: summarizeBackup(document) });
 
-    const { getByTestId } = await render(<BackupScreen />);
+    const { getByTestId, getByText } = await renderBackup();
     await fireEvent.press(getByTestId('backup-import-button'));
 
-    await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith(
-        '¿Reemplazar todos los datos?',
-        expect.any(String),
-        expect.any(Array),
-      ),
-    );
+    await waitFor(() => expect(getByText('¿Reemplazar todos los datos?')).toBeTruthy());
 
-    const confirm = findConfirmButton('¿Reemplazar todos los datos?');
-    expect(confirm).toBeTruthy();
-
-    await act(async () => {
-      confirm?.onPress?.();
-    });
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
 
     await waitFor(() =>
       expect(importDatabase).toHaveBeenCalledWith(document, { mode: 'replace' }),
@@ -224,33 +211,20 @@ describe('BackupScreen', () => {
       json: '{ not valid json',
     });
 
-    const { getByTestId } = await render(<BackupScreen />);
+    const { getByTestId, getByText } = await renderBackup();
     await fireEvent.press(getByTestId('backup-import-button'));
 
-    await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith('Archivo no válido', expect.any(String)),
-    );
+    await waitFor(() => expect(getByText('Archivo no válido')).toBeTruthy());
     expect(importDatabase).not.toHaveBeenCalled();
   });
 
   it('erases all data after a strong confirmation', async () => {
-    const { getByTestId } = await render(<BackupScreen />);
+    const { getByTestId, getByText } = await renderBackup();
     await fireEvent.press(getByTestId('backup-erase-button'));
 
-    await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith(
-        '¿Borrar todos los datos?',
-        expect.any(String),
-        expect.any(Array),
-      ),
-    );
+    await waitFor(() => expect(getByText('¿Borrar todos los datos?')).toBeTruthy());
 
-    const confirm = findConfirmButton('¿Borrar todos los datos?');
-    expect(confirm).toBeTruthy();
-
-    await act(async () => {
-      confirm?.onPress?.();
-    });
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
 
     await waitFor(() => expect(clearAllData).toHaveBeenCalledTimes(1));
     expect(mockResetToOnboarding).toHaveBeenCalledTimes(1);

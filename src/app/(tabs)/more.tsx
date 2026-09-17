@@ -1,9 +1,10 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useAuthStore } from '@/auth';
+import { showConfirm } from '@/dialog';
 import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { SectionHeader } from '@/components/section-header';
@@ -26,10 +27,14 @@ export default function MoreScreen() {
   const isAdmin = user?.role === 'ADMIN';
 
   const confirmSignOut = () => {
-    Alert.alert(t('auth.confirmSignOutTitle'), t('auth.confirmSignOutMessage'), [
-      { text: t('common.actions.cancel'), style: 'cancel' },
-      { text: t('common.actions.signOut'), style: 'destructive', onPress: () => signOut() },
-    ]);
+    showConfirm({
+      title: t('auth.confirmSignOutTitle'),
+      message: t('auth.confirmSignOutMessage'),
+      tone: 'warning',
+      confirmLabel: t('common.actions.signOut'),
+      confirmTone: 'danger',
+      onConfirm: () => signOut(),
+    });
   };
 
   return (

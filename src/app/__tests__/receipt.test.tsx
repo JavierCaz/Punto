@@ -1,11 +1,11 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 
 import ReceiptScreen from '@/app/receipt/[id]';
 import { refundSale, getSaleById, listPaymentMethods } from '@/db';
 import type { PaymentMethod, SaleDetail } from '@/db';
 import { i18n } from '@/i18n';
 import { useCartStore } from '@/pos/cart-store';
+import { DialogHost, dismissDialog } from '@/dialog';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
@@ -134,6 +134,7 @@ const mockRefundSale = refundSale as jest.MockedFunction<typeof refundSale>;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  dismissDialog();
   useCartStore.getState().reset();
   mockListPaymentMethods.mockResolvedValue([cash]);
   mockGetSaleById.mockResolvedValue(completedSale);
@@ -148,24 +149,24 @@ afterEach(async () => {
 
 describe('ReceiptScreen', () => {
   it('renders the receipt and refunds a completed sale after confirmation', async () => {
-    const alertSpy = jest
-      .spyOn(Alert, 'alert')
-      .mockImplementation((_title, _message, buttons) => {
-        buttons?.find((button) => button.style === 'destructive')?.onPress?.();
-      });
-
-    const { getByText } = await render(<ReceiptScreen />);
+    const { getByText, getByTestId } = await render(
+      <>
+        <ReceiptScreen />
+        <DialogHost />
+      </>,
+    );
 
     await waitFor(() => expect(getByText('Matcha Latte')).toBeTruthy());
     expect(getByText('S-000001')).toBeTruthy();
 
     await fireEvent.press(getByText('Reembolsar venta'));
 
+    await waitFor(() => expect(getByText('¿Reembolsar esta venta?')).toBeTruthy());
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
+
     await waitFor(() =>
       expect(mockRefundSale).toHaveBeenCalledWith('sale-1', { employeeId: 'emp-1' }),
     );
-
-    alertSpy.mockRestore();
   });
 
   it('resumes a held sale from the receipt', async () => {

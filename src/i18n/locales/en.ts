@@ -23,6 +23,7 @@ const en: typeof es = {
       continue: 'Continue',
       signOut: 'Sign out',
       select: 'Select',
+      ok: 'OK',
     },
     status: {
       loading: 'Loading…',

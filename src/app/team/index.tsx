@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,6 +19,7 @@ import {
   type AuthRole,
   type PublicEmployee,
 } from '@/auth';
+import { showConfirm, showMessage } from '@/dialog';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -110,7 +110,7 @@ export default function TeamScreen() {
           : err instanceof Error && err.message === 'AUTH_CANNOT_ARCHIVE_SELF'
             ? t('auth.archiveBlockedSelf')
             : t('common.status.error');
-      Alert.alert(t('common.status.error'), reason);
+      showMessage({ title: t('common.status.error'), message: reason, tone: 'danger' });
     } finally {
       setArchivingId(null);
     }
@@ -118,18 +118,14 @@ export default function TeamScreen() {
 
   const confirmArchive = (target: PublicEmployee) => {
     const name = fullName(target);
-    Alert.alert(
-      t('auth.archiveConfirmTitle', { name }),
-      t('auth.archiveConfirmMessage', { name }),
-      [
-        { text: t('common.actions.cancel'), style: 'cancel' },
-        {
-          text: t('common.actions.confirm'),
-          style: 'destructive',
-          onPress: () => void archive(target),
-        },
-      ],
-    );
+    showConfirm({
+      title: t('auth.archiveConfirmTitle', { name }),
+      message: t('auth.archiveConfirmMessage', { name }),
+      tone: 'danger',
+      confirmLabel: t('common.actions.confirm'),
+      confirmTone: 'danger',
+      onConfirm: () => void archive(target),
+    });
   };
 
   const renderHeaderAdd = () => (

@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { router, Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useAuthStore } from '@/auth';
 import { PrimaryButton } from '@/components/primary-button';
@@ -23,6 +23,7 @@ import {
   isDatabaseEmpty,
   isRepoError,
 } from '@/db';
+import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import {
   buildBackupFileName,
@@ -118,13 +119,25 @@ export default function BackupScreen() {
 
       if (await backupSharingAvailable()) {
         await shareBackupFile(uri, t('backup.shareTitle'));
-        Alert.alert(t('backup.exportSuccessTitle'), t('backup.exportSuccessMessage'));
+        showMessage({
+          title: t('backup.exportSuccessTitle'),
+          message: t('backup.exportSuccessMessage'),
+          tone: 'success',
+        });
       } else {
         await copyBackupToClipboard(json);
-        Alert.alert(t('backup.shareUnavailableTitle'), t('backup.shareUnavailableMessage'));
+        showMessage({
+          title: t('backup.shareUnavailableTitle'),
+          message: t('backup.shareUnavailableMessage'),
+          tone: 'warning',
+        });
       }
     } catch {
-      Alert.alert(t('backup.errorTitle'), t('backup.errors.generic'));
+      showMessage({
+        title: t('backup.errorTitle'),
+        message: t('backup.errors.generic'),
+        tone: 'danger',
+      });
     } finally {
       setBusy(false);
     }
@@ -135,9 +148,17 @@ export default function BackupScreen() {
     try {
       const document = await exportDatabase({ appVersion });
       await copyBackupToClipboard(serializeBackup(document));
-      Alert.alert(t('backup.copySuccessTitle'), t('backup.copySuccessMessage'));
+      showMessage({
+        title: t('backup.copySuccessTitle'),
+        message: t('backup.copySuccessMessage'),
+        tone: 'success',
+      });
     } catch {
-      Alert.alert(t('backup.errorTitle'), t('backup.errors.generic'));
+      showMessage({
+        title: t('backup.errorTitle'),
+        message: t('backup.errors.generic'),
+        tone: 'danger',
+      });
     } finally {
       setBusy(false);
     }
@@ -158,14 +179,18 @@ export default function BackupScreen() {
         }
 
         router.replace('/login');
-        Alert.alert(t('backup.importSuccessTitle'), t('backup.importSuccessMessage'));
+        showMessage({
+          title: t('backup.importSuccessTitle'),
+          message: t('backup.importSuccessMessage'),
+          tone: 'success',
+        });
       } catch (error) {
         const message = isRepoError(error, REPO_ERROR.BACKUP_CONFLICT)
           ? t('backup.errors.conflict')
           : isRepoError(error, REPO_ERROR.BACKUP_INVALID)
             ? t('backup.errors.invalid')
             : t('backup.errors.generic');
-        Alert.alert(t('backup.errorTitle'), message);
+        showMessage({ title: t('backup.errorTitle'), message, tone: 'danger' });
       } finally {
         setBusy(false);
       }
@@ -183,34 +208,40 @@ export default function BackupScreen() {
 
       const parsed = parseBackupJson(picked.json);
       if (!parsed.ok) {
-        Alert.alert(
-          t('backup.importInvalidTitle'),
-          formatValidationErrors(parsed.errors) || t('backup.importInvalidMessage'),
-        );
+        showMessage({
+          title: t('backup.importInvalidTitle'),
+          message: formatValidationErrors(parsed.errors) || t('backup.importInvalidMessage'),
+          tone: 'danger',
+        });
         return;
       }
 
       const validation = await inspectBackup(parsed.value);
       if (!validation.ok) {
-        Alert.alert(
-          t('backup.importInvalidTitle'),
-          formatValidationErrors(validation.errors) || t('backup.importInvalidMessage'),
-        );
+        showMessage({
+          title: t('backup.importInvalidTitle'),
+          message: formatValidationErrors(validation.errors) || t('backup.importInvalidMessage'),
+          tone: 'danger',
+        });
         return;
       }
 
-      Alert.alert(t('backup.importConfirmTitle'), t('backup.importConfirmMessage'), [
-        { text: t('common.actions.cancel'), style: 'cancel' },
-        {
-          text: t('common.actions.confirm'),
-          style: 'destructive',
-          onPress: () => {
-            void performImport(validation.document);
-          },
+      showConfirm({
+        title: t('backup.importConfirmTitle'),
+        message: t('backup.importConfirmMessage'),
+        tone: 'danger',
+        confirmLabel: t('common.actions.confirm'),
+        confirmTone: 'danger',
+        onConfirm: () => {
+          void performImport(validation.document);
         },
-      ]);
+      });
     } catch {
-      Alert.alert(t('backup.errorTitle'), t('backup.errors.generic'));
+      showMessage({
+        title: t('backup.errorTitle'),
+        message: t('backup.errors.generic'),
+        tone: 'danger',
+      });
     } finally {
       setBusy(false);
     }
@@ -222,25 +253,33 @@ export default function BackupScreen() {
       await clearAllData();
       await useAuthStore.getState().resetToOnboarding();
       router.replace('/onboarding');
-      Alert.alert(t('backup.eraseSuccessTitle'), t('backup.eraseSuccessMessage'));
+      showMessage({
+        title: t('backup.eraseSuccessTitle'),
+        message: t('backup.eraseSuccessMessage'),
+        tone: 'success',
+      });
     } catch {
-      Alert.alert(t('backup.errorTitle'), t('backup.errors.generic'));
+      showMessage({
+        title: t('backup.errorTitle'),
+        message: t('backup.errors.generic'),
+        tone: 'danger',
+      });
     } finally {
       setBusy(false);
     }
   }, [t]);
 
   const handleErase = useCallback(() => {
-    Alert.alert(t('backup.eraseConfirmTitle'), t('backup.eraseConfirmMessage'), [
-      { text: t('common.actions.cancel'), style: 'cancel' },
-      {
-        text: t('backup.eraseAction'),
-        style: 'destructive',
-        onPress: () => {
-          void performErase();
-        },
+    showConfirm({
+      title: t('backup.eraseConfirmTitle'),
+      message: t('backup.eraseConfirmMessage'),
+      tone: 'danger',
+      confirmLabel: t('backup.eraseAction'),
+      confirmTone: 'danger',
+      onConfirm: () => {
+        void performErase();
       },
-    ]);
+    });
   }, [performErase, t]);
 
   const hasSummary = !loading && stats !== null && stats.totalRows > 0;

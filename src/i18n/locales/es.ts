@@ -28,6 +28,7 @@ export default {
       continue: 'Continuar',
       signOut: 'Cerrar sesión',
       select: 'Seleccionar',
+      ok: 'Aceptar',
     },
     status: {
       loading: 'Cargando…',

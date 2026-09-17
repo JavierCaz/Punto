@@ -12,6 +12,7 @@ import '@/global.css';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/auth';
 import { getBusinessProfile } from '@/db';
+import { DialogHost } from '@/dialog';
 import { useDbBootstrap } from '@/hooks/use-db-bootstrap';
 import { useEffectiveColorScheme, useTheme } from '@/hooks/use-theme';
 import { i18n, setLanguage } from '@/i18n'; // also initialises i18n + dayjs locale
@@ -148,6 +149,7 @@ export default function RootLayout() {
             </Stack.Protected>
           </Stack>
         ) : null}
+        <DialogHost />
       </ThemeProvider>
     </View>
   );

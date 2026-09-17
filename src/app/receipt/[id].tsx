@@ -1,7 +1,7 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { listActiveEmployees, useAuthStore } from '@/auth';
 import { PrimaryButton } from '@/components/primary-button';
@@ -20,6 +20,7 @@ import {
   type PaymentMethod,
   type SaleDetail,
 } from '@/db';
+import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import { useCartStore } from '@/pos/cart-store';
 
@@ -85,17 +86,25 @@ export default function ReceiptScreen() {
       await refundSale(sale.id, { employeeId: user?.id });
       await load();
     } catch {
-      Alert.alert(t('pos.receipt.refundFailed'));
+      showMessage({
+        title: t('common.status.error'),
+        message: t('pos.receipt.refundFailed'),
+        tone: 'danger',
+      });
     } finally {
       setRefunding(false);
     }
   }, [sale, user, load, t]);
 
   const confirmRefund = (): void => {
-    Alert.alert(t('pos.receipt.refundConfirmTitle'), t('pos.receipt.refundConfirmMessage'), [
-      { text: t('common.actions.cancel'), style: 'cancel' },
-      { text: t('pos.receipt.refund'), style: 'destructive', onPress: () => void handleRefund() },
-    ]);
+    showConfirm({
+      title: t('pos.receipt.refundConfirmTitle'),
+      message: t('pos.receipt.refundConfirmMessage'),
+      tone: 'danger',
+      confirmLabel: t('pos.receipt.refund'),
+      confirmTone: 'danger',
+      onConfirm: () => void handleRefund(),
+    });
   };
 
   const handleResume = async (): Promise<void> => {
@@ -106,7 +115,11 @@ export default function ReceiptScreen() {
     if (useCartStore.getState().saleId === sale.id) {
       router.replace('/');
     } else {
-      Alert.alert(t('pos.cart.resumeFailed'));
+      showMessage({
+        title: t('common.status.error'),
+        message: t('pos.cart.resumeFailed'),
+        tone: 'danger',
+      });
     }
   };
 
@@ -114,23 +127,27 @@ export default function ReceiptScreen() {
     if (!sale) {
       return;
     }
-    Alert.alert(t('pos.cart.discardConfirmTitle'), t('pos.cart.discardConfirmMessage'), [
-      { text: t('common.actions.cancel'), style: 'cancel' },
-      {
-        text: t('pos.cart.discard'),
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await cancelSale(sale.id);
-              router.back();
-            } catch {
-              Alert.alert(t('pos.cart.discardFailed'));
-            }
-          })();
-        },
+    showConfirm({
+      title: t('pos.cart.discardConfirmTitle'),
+      message: t('pos.cart.discardConfirmMessage'),
+      tone: 'danger',
+      confirmLabel: t('pos.cart.discard'),
+      confirmTone: 'danger',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await cancelSale(sale.id);
+            router.back();
+          } catch {
+            showMessage({
+              title: t('common.status.error'),
+              message: t('pos.cart.discardFailed'),
+              tone: 'danger',
+            });
+          }
+        })();
       },
-    ]);
+    });
   };
 
   return (

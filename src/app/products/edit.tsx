@@ -1,7 +1,7 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { ProductForm } from '@/components/product-form';
 import { Screen } from '@/components/screen';
@@ -29,6 +29,7 @@ import {
   type RecipeDetail,
   type Supplier,
 } from '@/db';
+import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import {
   buildProductCreateInput,
@@ -203,28 +204,28 @@ export default function ProductEditScreen() {
       return;
     }
     const name = product.name;
-    Alert.alert(
-      t('products.form.deleteConfirmTitle', { name }),
-      t('products.form.deleteConfirmMessage'),
-      [
-        { text: t('common.actions.cancel'), style: 'cancel' },
-        {
-          text: t('common.actions.delete'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                await archiveProduct(product.id);
-                deleteProductImage(product.imageUri);
-                router.back();
-              } catch {
-                Alert.alert(t('common.status.error'), t('products.form.deleteFailed'));
-              }
-            })();
-          },
-        },
-      ],
-    );
+    showConfirm({
+      title: t('products.form.deleteConfirmTitle', { name }),
+      message: t('products.form.deleteConfirmMessage'),
+      tone: 'danger',
+      confirmLabel: t('common.actions.delete'),
+      confirmTone: 'danger',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await archiveProduct(product.id);
+            deleteProductImage(product.imageUri);
+            router.back();
+          } catch {
+            showMessage({
+              title: t('common.status.error'),
+              message: t('products.form.deleteFailed'),
+              tone: 'danger',
+            });
+          }
+        })();
+      },
+    });
   };
 
   return (

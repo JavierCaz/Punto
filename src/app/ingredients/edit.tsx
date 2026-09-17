@@ -1,7 +1,7 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { InventoryItemForm, type InventoryItemFormValues } from '@/components/inventory-item-form';
 import { Screen } from '@/components/screen';
@@ -27,6 +27,7 @@ import {
   type Supplier,
   type Unit,
 } from '@/db';
+import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import { parseQuantityMilli } from '@/lib/catalog-form';
 
@@ -195,27 +196,27 @@ export default function InventoryItemEditScreen() {
       return;
     }
     const name = item.name;
-    Alert.alert(
-      t('inventory.form.deleteConfirmTitle', { name }),
-      t('inventory.form.deleteConfirmMessage'),
-      [
-        { text: t('common.actions.cancel'), style: 'cancel' },
-        {
-          text: t('common.actions.delete'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                await archiveInventoryItem(item.id);
-                router.back();
-              } catch {
-                Alert.alert(t('common.status.error'), t('inventory.form.deleteFailed'));
-              }
-            })();
-          },
-        },
-      ],
-    );
+    showConfirm({
+      title: t('inventory.form.deleteConfirmTitle', { name }),
+      message: t('inventory.form.deleteConfirmMessage'),
+      tone: 'danger',
+      confirmLabel: t('common.actions.delete'),
+      confirmTone: 'danger',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await archiveInventoryItem(item.id);
+            router.back();
+          } catch {
+            showMessage({
+              title: t('common.status.error'),
+              message: t('inventory.form.deleteFailed'),
+              tone: 'danger',
+            });
+          }
+        })();
+      },
+    });
   };
 
   return (

@@ -1,7 +1,7 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { CategoryForm } from '@/components/category-form';
 import { Screen } from '@/components/screen';
@@ -17,6 +17,7 @@ import {
   updateCategory,
   type Category,
 } from '@/db';
+import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function CategoryEditScreen() {
@@ -92,27 +93,27 @@ export default function CategoryEditScreen() {
       return;
     }
     const name = category.name;
-    Alert.alert(
-      t('categories.form.deleteConfirmTitle', { name }),
-      t('categories.form.deleteConfirmMessage'),
-      [
-        { text: t('common.actions.cancel'), style: 'cancel' },
-        {
-          text: t('common.actions.delete'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                await archiveCategory(category.id);
-                router.back();
-              } catch {
-                Alert.alert(t('common.status.error'), t('categories.form.deleteFailed'));
-              }
-            })();
-          },
-        },
-      ],
-    );
+    showConfirm({
+      title: t('categories.form.deleteConfirmTitle', { name }),
+      message: t('categories.form.deleteConfirmMessage'),
+      tone: 'danger',
+      confirmLabel: t('common.actions.delete'),
+      confirmTone: 'danger',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await archiveCategory(category.id);
+            router.back();
+          } catch {
+            showMessage({
+              title: t('common.status.error'),
+              message: t('categories.form.deleteFailed'),
+              tone: 'danger',
+            });
+          }
+        })();
+      },
+    });
   };
 
   return (
