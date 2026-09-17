@@ -5,6 +5,8 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    // Build output and the isolated Electron shell package are not linted by
+    // the Expo app config (the shell is plain Node/CommonJS).
+    ignores: ["dist/**", "electron/**"],
   }
 ]);

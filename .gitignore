@@ -45,3 +45,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Electron desktop shell (isolated sibling package)
+electron/node_modules/
+electron/release/
+/android

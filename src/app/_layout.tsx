@@ -11,7 +11,7 @@ import '@/global.css';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useAuthStore } from '@/auth';
-import { getBusinessProfile } from '@/db';
+import { getBusinessProfile, getDb } from '@/db';
 import { DialogHost } from '@/dialog';
 import { useDbBootstrap } from '@/hooks/use-db-bootstrap';
 import { useEffectiveColorScheme, useTheme } from '@/hooks/use-theme';
@@ -54,6 +54,16 @@ export default function RootLayout() {
     let cancelled = false;
 
     async function hydrateStores() {
+      // expo-sqlite's web worker does not guard its VFS initialization against
+      // concurrent database opens. Open the app database first so the kv-store
+      // (a second database, opened by the hydrations below) cannot race it and
+      // corrupt the OPFS access-handle pool setup.
+      try {
+        await getDb();
+      } catch {
+        // useDbBootstrap surfaces DB failures; skip preference hydration.
+        return;
+      }
       await Promise.all([
         useThemeStore.getState().hydrate(),
         useAccentStore.getState().hydrate(getBusinessProfile),

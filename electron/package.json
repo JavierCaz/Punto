@@ -1,0 +1,23 @@
+{
+  "name": "punto-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Electron desktop shell for the Punto static web export.",
+  "author": "Javier Cazares",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "export:web": "node scripts/export-web.mjs",
+    "start": "electron .",
+    "dev": "npm run export:web && electron .",
+    "pack": "npm run export:web && electron-builder --dir",
+    "dist": "npm run export:web && electron-builder",
+    "dist:win": "npm run export:web && electron-builder --win",
+    "dist:linux": "npm run export:web && electron-builder --linux",
+    "dist:mac": "npm run export:web && electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "44.4.1",
+    "electron-builder": "26.15.3"
+  }
+}

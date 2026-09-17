@@ -65,6 +65,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "web:export": "expo export -p web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
@@ -77,7 +78,11 @@
     "build:preview:ios": "eas build --profile preview --platform ios",
     "build:android": "eas build --profile production --platform android",
     "build:ios": "eas build --profile production --platform ios",
-    "build:all": "eas build --profile production --platform all"
+    "build:all": "eas build --profile production --platform all",
+    "desktop:install": "npm --prefix electron install",
+    "desktop:dev": "npm --prefix electron run dev",
+    "desktop:pack": "npm --prefix electron run pack",
+    "desktop:dist": "npm --prefix electron run dist"
   },
   "private": true
 }

@@ -1,0 +1,51 @@
+appId: com.javiercaz.punto
+productName: Punto
+copyright: Copyright © 2026 Javier Cazares
+
+directories:
+  output: release
+  # Icons live with the app assets so there is a single source of truth.
+  buildResources: ../assets
+
+# Only the Electron shell goes into the asar. The web export is copied verbatim
+# into resources/dist (extraResources) so the static server can stream it and
+# keep control of WebAssembly MIME types.
+files:
+  - main.js
+  - static-server.js
+  - package.json
+
+extraResources:
+  - from: ../dist
+    to: dist
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: images/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-setup.${ext}
+
+linux:
+  target:
+    - AppImage
+  executableName: punto
+  category: Office
+  icon: images/icon.png
+  synopsis: Offline-first point-of-sale and business management
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+mac:
+  target:
+    - dmg
+  category: public.app-category.business
+  icon: images/icon.png
+  artifactName: ${productName}-${version}-${arch}.${ext}

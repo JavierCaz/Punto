@@ -1,0 +1,5 @@
+# dependencies
+node_modules/
+
+# electron-builder output (installers + unpacked app)
+release/
