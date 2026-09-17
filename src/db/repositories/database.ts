@@ -27,6 +27,13 @@ export interface RunResult {
 }
 
 export interface DatabaseAdapter {
+  /**
+   * Execute one or more raw statements (DDL, PRAGMA, transaction control).
+   * Exposed so import/export can set per-connection pragmas (e.g.
+   * `defer_foreign_keys`) inside the sanctioned transaction; it is NOT a
+   * second way to open transactions — `withTransaction` remains the only one.
+   */
+  execAsync(source: string): Promise<void>;
   getFirstAsync<T>(source: string, ...params: SqlValue[]): Promise<T | null>;
   getAllAsync<T>(source: string, ...params: SqlValue[]): Promise<T[]>;
   runAsync(source: string, ...params: SqlValue[]): Promise<RunResult>;

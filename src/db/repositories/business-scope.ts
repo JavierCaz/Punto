@@ -42,8 +42,19 @@ export async function getBusinessId(): Promise<string> {
   return businessIdPromise;
 }
 
-/** Test helper: clear the memo so the next `getBusinessId()` re-queries. */
-export function resetBusinessIdForTesting(): void {
+/**
+ * Clear the memo so the next `getBusinessId()` re-queries.
+ *
+ * MUST be called after any bulk change that replaces or removes the single
+ * business row (JSON import / clear-all): otherwise every repository keeps
+ * scoping its queries to the stale id and the app appears empty.
+ */
+export function resetBusinessScope(): void {
   cachedBusinessId = null;
   businessIdPromise = null;
+}
+
+/** Test helper alias for {@link resetBusinessScope}. */
+export function resetBusinessIdForTesting(): void {
+  resetBusinessScope();
 }

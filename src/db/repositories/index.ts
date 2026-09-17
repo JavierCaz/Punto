@@ -61,7 +61,7 @@ export {
 export type { StockStatus } from '@/db/repositories/calc';
 
 // Business scope.
-export { getBusinessId, resetBusinessIdForTesting } from '@/db/repositories/business-scope';
+export { getBusinessId, resetBusinessIdForTesting, resetBusinessScope } from '@/db/repositories/business-scope';
 
 // Shared domain vocabulary.
 export {
@@ -311,3 +311,24 @@ export type {
   SaleRange,
   TopProduct,
 } from '@/db/repositories/analytics';
+
+// JSON backup (data portability: export / import / clear).
+export {
+  clearAllData,
+  exportDatabase,
+  importDatabase,
+  inspectBackup,
+  isDatabaseEmpty,
+} from '@/db/repositories/backup';
+export type {
+  BackupImportResult,
+  ExportDatabaseOptions,
+  ImportDatabaseOptions,
+  ImportMode,
+} from '@/db/repositories/backup';
+export type {
+  BackupDocument,
+  BackupStats,
+  BackupValidationError,
+  BackupValidationResult,
+} from '@/lib/backup-format';

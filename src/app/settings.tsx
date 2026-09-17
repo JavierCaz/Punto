@@ -1,8 +1,10 @@
-import { Stack } from 'expo-router';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Stack, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { BusinessProfileEditor } from '@/components/business-profile-editor';
+import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
 import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
@@ -41,6 +43,20 @@ export default function SettingsScreen() {
         <SectionHeader level="section" title={t('settings.business')} />
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
           <BusinessProfileEditor />
+        </ThemedView>
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader level="section" title={t('settings.data')} />
+        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+          <ListRow
+            icon="database-outline"
+            title={t('backup.title')}
+            subtitle={t('backup.subtitle')}
+            onPress={() => router.push('/backup')}
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            testID="settings-backup-row"
+          />
         </ThemedView>
       </View>
 

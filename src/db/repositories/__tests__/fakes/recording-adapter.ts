@@ -60,6 +60,10 @@ export class RecordingAdapter implements DatabaseAdapter {
     this.allQueue.push({ fragment, rows });
   }
 
+  async execAsync(source: string): Promise<void> {
+    this.calls.push({ sql: source, params: [] });
+  }
+
   async getFirstAsync<T>(source: string, ...params: SqlValue[]): Promise<T | null> {
     this.calls.push({ sql: source, params });
 

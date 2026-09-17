@@ -135,6 +135,7 @@ export default function RootLayout() {
             <Stack.Protected guard={authPhase === 'ready'}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="settings" />
+              <Stack.Screen name="backup" />
               <Stack.Screen name="team" />
               <Stack.Screen name="products" />
               <Stack.Screen name="categories" />

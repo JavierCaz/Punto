@@ -66,6 +66,12 @@ interface AuthStoreState {
     password: string;
   }) => Promise<OnboardingOutcome>;
   signOut: () => void;
+  /**
+   * Reset the session after the business row is removed (clear-all data):
+   * clears the persisted session pointer + login limiter and returns to the
+   * first-run onboarding phase.
+   */
+  resetToOnboarding: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStoreState>()((set, get) => ({
@@ -142,5 +148,15 @@ export const useAuthStore = create<AuthStoreState>()((set, get) => ({
       // Noop — the in-memory phase change already applies for this session.
     });
     set({ user: null, phase: 'login' });
+  },
+
+  resetToOnboarding: async () => {
+    loginLimiter.clear();
+    try {
+      await Storage.removeItemAsync(SESSION_STORAGE_KEY);
+    } catch {
+      // Noop — the in-memory phase change already applies for this session.
+    }
+    set({ user: null, phase: 'onboarding' });
   },
 }));
