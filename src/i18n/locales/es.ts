@@ -100,6 +100,7 @@ export default {
     salesSectionTitle: 'Rendimiento de ventas',
     salesTotalLabel: 'Total vendido',
     trendTitle: 'Tendencia de ingresos',
+    trendWeekLabel: 'Sem {{week}}',
     topProductsTitle: 'Productos más vendidos',
     topProductsEmpty: 'Aún no hay ventas en este periodo.',
     problemsTitle: 'Necesita tu atención',

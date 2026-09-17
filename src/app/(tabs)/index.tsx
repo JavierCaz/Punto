@@ -138,7 +138,6 @@ export default function DashboardScreen() {
     currency,
     report,
     trend,
-    granularity,
     topProducts,
     lowStock,
     heldCount,
@@ -327,7 +326,7 @@ export default function DashboardScreen() {
         <ThemedView type="backgroundElement" style={[styles.chartCard, { borderColor: theme.border }]}>
           <IncomeTrendChart
             data={trend}
-            granularity={granularity}
+            period={period}
             currency={currency}
             testID="dashboard-trend-chart"
           />

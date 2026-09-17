@@ -42,21 +42,16 @@ function buildNumberFormat(
 /**
  * Format an integer minor (cents) amount with the given currency.
  * `minorUnits` defaults to 2 (USD/MXN style cent precision).
+ * `trimZeroFraction` drops the decimals on whole amounts ("$1,230" instead of
+ * "$1,230.00") — used for compact chart labels; cents are kept otherwise.
  */
 export function formatMoney(
   minor: number,
   currency: string,
-  opts: { minorUnits?: number; locale?: string } = {},
+  opts: { minorUnits?: number; locale?: string; trimZeroFraction?: boolean } = {},
 ): string {
   const minorUnits = opts.minorUnits ?? 2;
   const locale = resolveLocale(opts.locale);
-  const formatter = buildNumberFormat(locale, {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'symbol',
-    minimumFractionDigits: minorUnits,
-    maximumFractionDigits: minorUnits,
-  });
 
   // Split minor into major + fraction with integer math so the value handed
   // to Intl has exact significant digits (no float drift from division).
@@ -64,6 +59,15 @@ export function formatMoney(
   const major = Math.trunc(minor / scale);
   const fraction = Math.abs(minor % scale);
   const value = major + fraction / scale;
+
+  const digits = opts.trimZeroFraction === true && fraction === 0 ? 0 : minorUnits;
+  const formatter = buildNumberFormat(locale, {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'symbol',
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 
   return formatter.format(value);
 }

@@ -16,6 +16,7 @@ import {
   periodGranularity,
   periodRange,
   trailingDayRange,
+  trendAxisTicks,
 } from '@/lib/dashboard';
 
 describe('dayRange', () => {
@@ -210,5 +211,78 @@ describe('formatTrendLabel', () => {
     expect(formatTrendLabel('2026-09-08', 'day', 'en')).toContain('Tue');
     expect(formatTrendLabel('2026-09', 'month', 'es')).toContain('sep');
     expect(formatTrendLabel('2026-09', 'month', 'en')).toContain('Sep');
+  });
+});
+
+describe('trendAxisTicks', () => {
+  const hourlyDay = Array.from({ length: 24 }, (_, hour) => ({
+    key: `2026-09-08T${String(hour).padStart(2, '0')}`,
+    totalMinor: hour === 12 ? 5000 : 0,
+  }));
+  const dailyMonth = Array.from({ length: 31 }, (_, day) => ({
+    key: `2026-09-${String(day + 1).padStart(2, '0')}`,
+    totalMinor: 1000,
+  }));
+
+  it('shows hour ticks for a day, thinned to at most 7', () => {
+    const ticks = trendAxisTicks(hourlyDay, 'day');
+    expect(ticks.length).toBeLessThanOrEqual(7);
+    expect(ticks.every((tick) => tick.kind === 'hour')).toBe(true);
+    expect(ticks[0]).toMatchObject({ index: 0, key: '2026-09-08T00' });
+    expect(ticks.find((tick) => tick.index === 12)?.totalMinor).toBe(5000);
+    // Every tick anchors to a real point so the label lines up with the curve.
+    expect(ticks.every((tick) => hourlyDay[tick.index].key === tick.key)).toBe(true);
+  });
+
+  it('shows one tick per week block for a month', () => {
+    const ticks = trendAxisTicks(dailyMonth, 'month');
+    expect(ticks.map((tick) => tick.index)).toEqual([0, 7, 14, 21, 28]);
+    expect(ticks.map((tick) => tick.week)).toEqual([1, 2, 3, 4, 5]);
+    expect(ticks.every((tick) => tick.kind === 'week')).toBe(true);
+    expect(ticks.map((tick) => tick.totalMinor)).toEqual([7000, 7000, 7000, 7000, 3000]);
+  });
+
+  it('shows every weekday for a week and month ticks for a year', () => {
+    const week = Array.from({ length: 7 }, (_, day) => ({
+      key: `2026-09-${String(day + 8).padStart(2, '0')}`,
+      totalMinor: 0,
+    }));
+    expect(trendAxisTicks(week, 'week').map((tick) => tick.kind)).toEqual(Array(7).fill('day'));
+
+    const year = Array.from({ length: 12 }, (_, month) => ({
+      key: `2026-${String(month + 1).padStart(2, '0')}`,
+      totalMinor: 0,
+    }));
+    const yearTicks = trendAxisTicks(year, 'year');
+    expect(yearTicks.length).toBeLessThanOrEqual(7);
+    expect(yearTicks.every((tick) => tick.kind === 'month')).toBe(true);
+  });
+
+  it('labels all time by year and sums each year', () => {
+    const monthly = [
+      { key: '2024-11', totalMinor: 100 },
+      { key: '2024-12', totalMinor: 200 },
+      { key: '2025-01', totalMinor: 300 },
+      { key: '2025-02', totalMinor: 400 },
+      { key: '2026-01', totalMinor: 500 },
+    ];
+    const ticks = trendAxisTicks(monthly, 'all');
+    expect(ticks.map((tick) => tick.key)).toEqual(['2024-11', '2025-01', '2026-01']);
+    expect(ticks.map((tick) => tick.totalMinor)).toEqual([300, 700, 500]);
+    expect(ticks.every((tick) => tick.kind === 'year')).toBe(true);
+  });
+
+  it('still labels all time by year when it fits in a single year', () => {
+    const monthly = [
+      { key: '2026-07', totalMinor: 0 },
+      { key: '2026-08', totalMinor: 0 },
+      { key: '2026-09', totalMinor: 0 },
+    ];
+    const ticks = trendAxisTicks(monthly, 'all');
+    expect(ticks).toEqual([{ index: 0, key: '2026-07', kind: 'year', week: null, totalMinor: 0 }]);
+  });
+
+  it('returns no ticks for an empty series', () => {
+    expect(trendAxisTicks([], 'day')).toEqual([]);
   });
 });

@@ -22,6 +22,17 @@ describe('formatMoney', () => {
     // 99999999 cents → $999,999.99 exactly.
     expect(formatMoney(99999999, 'USD', { locale: 'en-US' })).toBe('$999,999.99');
   });
+
+  it('trims zero cents on whole amounts for compact labels', () => {
+    expect(formatMoney(123000, 'MXN', { trimZeroFraction: true, locale: 'es-MX' })).toBe(
+      '$1,230',
+    );
+    expect(formatMoney(123050, 'MXN', { trimZeroFraction: true, locale: 'es-MX' })).toBe(
+      '$1,230.50',
+    );
+    // Unchanged when the option is off.
+    expect(formatMoney(123000, 'MXN', { locale: 'es-MX' })).toBe('$1,230.00');
+  });
 });
 
 describe('formatQuantity', () => {

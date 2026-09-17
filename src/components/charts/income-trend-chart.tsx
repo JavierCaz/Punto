@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 import { CartesianChart, Line } from 'victory-native';
 
@@ -6,16 +7,20 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { i18n } from '@/i18n';
 import { formatMoney } from '@/i18n/format';
-import { formatTrendLabel, type TrendGranularity, type TrendPoint } from '@/lib/dashboard';
-
-/** Maximum number of x-axis labels rendered, regardless of bucket count. */
-const MAX_LABELS = 7;
+import {
+  formatTrendLabel,
+  MAX_TREND_AXIS_TICKS,
+  trendAxisTicks,
+  type DashboardPeriod,
+  type TrendAxisTick,
+  type TrendPoint,
+} from '@/lib/dashboard';
 
 export type IncomeTrendChartProps = {
   /** Dense, ordered trend series for the active period. */
   data: TrendPoint[];
-  /** Bucket granularity, used to format the labels. */
-  granularity: TrendGranularity;
+  /** Active window; drives the x-axis unit (hours / weeks / years). */
+  period: DashboardPeriod;
   /** Business currency code for locale-aware money formatting. */
   currency: string;
   /** Chart height in dp. */
@@ -26,22 +31,40 @@ export type IncomeTrendChartProps = {
 /**
  * Gross completed-sale income across the selected period, as a line chart
  * (victory-native + Skia). Axis labels are plain text rendered by the parent
- * grid — Skia axis text needs a bundled font — and are thinned to at most
- * `MAX_LABELS` so hourly/daily buckets stay readable.
+ * grid — Skia axis text needs a bundled font — and reflect the unit the owner
+ * reasons in for the active period: hours for a day, weekdays for a week, weeks
+ * for a month, months for a year and years for all time. Each label also shows
+ * the total income of the bucket it represents (a whole week, a whole year).
+ * The value domain is padded so a peak or a zero baseline never clips against
+ * the plot edges.
  */
 export function IncomeTrendChart({
   data,
-  granularity,
+  period,
   currency,
   height = 180,
   testID,
 }: IncomeTrendChartProps) {
   const theme = useTheme();
+  const { t } = useTranslation();
   const locale = i18n.language === 'en' ? 'en' : 'es';
 
   const maxMinor = Math.max(0, ...data.map((point) => point.totalMinor));
   const chartData = data.map((point) => ({ key: point.key, totalMinor: point.totalMinor }));
-  const labelStride = Math.max(1, Math.ceil(data.length / MAX_LABELS));
+  const ticks = trendAxisTicks(data, period, MAX_TREND_AXIS_TICKS);
+
+  const tickLabel = (tick: TrendAxisTick): string => {
+    switch (tick.kind) {
+      case 'hour':
+      case 'day':
+      case 'month':
+        return formatTrendLabel(tick.key, tick.kind, locale);
+      case 'week':
+        return t('dashboard.trendWeekLabel', { week: tick.week ?? 0 });
+      case 'year':
+        return tick.key.slice(0, 4);
+    }
+  };
 
   return (
     <View testID={testID} style={styles.container}>
@@ -55,6 +78,7 @@ export function IncomeTrendChart({
           xKey="key"
           yKeys={['totalMinor']}
           domain={{ y: [0, maxMinor > 0 ? maxMinor : 1] }}
+          domainPadding={{ top: 16, bottom: 12 }}
           axisOptions={{ lineColor: theme.border, labelColor: theme.textSecondary }}
           frame={{ lineColor: theme.border }}>
           {({ points }) => (
@@ -69,15 +93,15 @@ export function IncomeTrendChart({
       </View>
 
       <View style={styles.labels}>
-        {data.map((point, index) => (
-          <ThemedText
-            key={point.key}
-            type="micro"
-            themeColor="textSecondary"
-            numberOfLines={1}
-            style={styles.label}>
-            {index % labelStride === 0 ? formatTrendLabel(point.key, granularity, locale) : ''}
-          </ThemedText>
+        {ticks.map((tick) => (
+          <View key={tick.key} style={styles.tick}>
+            <ThemedText type="micro" themeColor="textSecondary" numberOfLines={1}>
+              {tickLabel(tick)}
+            </ThemedText>
+            <ThemedText type="code" themeColor="textSecondary" numberOfLines={1}>
+              {formatMoney(tick.totalMinor, currency, { trimZeroFraction: true })}
+            </ThemedText>
+          </View>
         ))}
       </View>
     </View>
@@ -93,8 +117,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.one,
   },
-  label: {
-    flex: 1,
-    textAlign: 'center',
+  tick: {
+    flexShrink: 1,
+    alignItems: 'center',
   },
 });

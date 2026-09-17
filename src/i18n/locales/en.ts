@@ -95,6 +95,7 @@ const en: typeof es = {
     salesSectionTitle: 'Sales performance',
     salesTotalLabel: 'Total sold',
     trendTitle: 'Income trend',
+    trendWeekLabel: 'Wk {{week}}',
     topProductsTitle: 'Top products',
     topProductsEmpty: 'No sales in this period yet.',
     problemsTitle: 'Needs your attention',

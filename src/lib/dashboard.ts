@@ -261,3 +261,122 @@ export function formatTrendLabel(
   }
   return dayjs(`${key}-01T00:00:00`).locale(locale).format('MMM');
 }
+
+/** Maximum x-axis labels a trend chart shows, regardless of bucket count. */
+export const MAX_TREND_AXIS_TICKS = 7;
+
+/** Unit a trend axis tick represents; drives how its label is formatted. */
+export type TrendAxisTickKind = 'hour' | 'day' | 'week' | 'month' | 'year';
+
+/** One label rendered under the income-trend chart. */
+export interface TrendAxisTick {
+  /** Index into the dense trend series the tick anchors to. */
+  index: number;
+  /** Bucket key the tick anchors to (used for the label and the React key). */
+  key: string;
+  /** Unit the label represents. */
+  kind: TrendAxisTickKind;
+  /** 1-based week ordinal for `week` ticks; null for every other kind. */
+  week: number | null;
+  /** Total income for the bucket this tick represents, in minor units. */
+  totalMinor: number;
+}
+
+/**
+ * Pick the x-axis ticks for a period's trend series. Labels reflect the unit
+ * the owner reasons in for that window (AGENTS §5.2): hours for a day, days
+ * for a week, weeks for a month, months for a year, and years for all time.
+ * Ticks are thinned to at most `maxTicks` so labels never overlap.
+ */
+export function trendAxisTicks(
+  points: readonly TrendPoint[],
+  period: DashboardPeriod,
+  maxTicks: number = MAX_TREND_AXIS_TICKS,
+): TrendAxisTick[] {
+  if (points.length === 0 || maxTicks < 1) {
+    return [];
+  }
+
+  if (period === 'day') {
+    return evenlySpacedTicks(points, 'hour', maxTicks);
+  }
+  if (period === 'week') {
+    return evenlySpacedTicks(points, 'day', maxTicks);
+  }
+  if (period === 'month') {
+    // One tick per week block (days 1–7, 8–14, …), summing each block so the
+    // label can show the week's total.
+    const ticks: TrendAxisTick[] = [];
+    for (let index = 0; index < points.length; index += 7) {
+      ticks.push({
+        index,
+        key: points[index].key,
+        kind: 'week',
+        week: ticks.length + 1,
+        totalMinor: sumRange(points, index, index + 7),
+      });
+    }
+    return ticks;
+  }
+  if (period === 'year') {
+    return evenlySpacedTicks(points, 'month', maxTicks);
+  }
+
+  // `all`: one tick per year present, even when every sale falls in one year.
+  // The owner reads this window in years, so never fall back to month labels.
+  // Each tick sums its whole year.
+  const yearTicks: TrendAxisTick[] = [];
+  let previousYear: string | null = null;
+  for (let index = 0; index < points.length; index++) {
+    const year = points[index].key.slice(0, 4);
+    if (year !== previousYear) {
+      yearTicks.push({
+        index,
+        key: points[index].key,
+        kind: 'year',
+        week: null,
+        totalMinor: 0,
+      });
+      previousYear = year;
+    }
+  }
+  for (let position = 0; position < yearTicks.length; position++) {
+    const end =
+      position + 1 < yearTicks.length ? yearTicks[position + 1].index : points.length;
+    yearTicks[position].totalMinor = sumRange(points, yearTicks[position].index, end);
+  }
+  return thinTicks(yearTicks, maxTicks);
+}
+
+/** Every `stride`-th point, so at most `maxTicks` labels are shown. */
+function evenlySpacedTicks(
+  points: readonly TrendPoint[],
+  kind: TrendAxisTickKind,
+  maxTicks: number,
+): TrendAxisTick[] {
+  const stride = Math.max(1, Math.ceil(points.length / maxTicks));
+  const ticks: TrendAxisTick[] = [];
+  for (let index = 0; index < points.length; index += stride) {
+    ticks.push({ index, key: points[index].key, kind, week: null, totalMinor: points[index].totalMinor });
+  }
+  return ticks;
+}
+
+/** Thin an already-built tick list down to at most `maxTicks`. */
+function thinTicks(ticks: readonly TrendAxisTick[], maxTicks: number): TrendAxisTick[] {
+  const stride = Math.max(1, Math.ceil(ticks.length / maxTicks));
+  const thinned: TrendAxisTick[] = [];
+  for (let index = 0; index < ticks.length; index += stride) {
+    thinned.push(ticks[index]);
+  }
+  return thinned;
+}
+
+/** Sum of a half-open range of trend points, for aggregate tick values. */
+function sumRange(points: readonly TrendPoint[], from: number, toExclusive: number): number {
+  let total = 0;
+  for (let index = from; index < toExclusive && index < points.length; index++) {
+    total += points[index].totalMinor;
+  }
+  return total;
+}
