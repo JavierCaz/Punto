@@ -19,15 +19,17 @@ import { useTheme } from '@/hooks/use-theme';
 
 type TabIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-const TABS: { name: string; href: '/' | '/sales' | '/inventory' | '/more'; icon: TabIconName }[] = [
-  { name: 'index', href: '/', icon: 'point-of-sale' },
+const TABS: { name: string; href: '/' | '/pos' | '/sales' | '/inventory' | '/more'; icon: TabIconName }[] = [
+  { name: 'index', href: '/', icon: 'view-dashboard-outline' },
+  { name: 'pos', href: '/pos', icon: 'point-of-sale' },
   { name: 'sales', href: '/sales', icon: 'receipt-text-outline' },
   { name: 'inventory', href: '/inventory', icon: 'package-variant-closed' },
   { name: 'more', href: '/more', icon: 'dots-horizontal' },
 ];
 
 const TAB_LABEL_KEY = {
-  index: 'tabs.pos',
+  index: 'tabs.dashboard',
+  pos: 'tabs.pos',
   sales: 'tabs.sales',
   inventory: 'tabs.inventory',
   more: 'tabs.more',

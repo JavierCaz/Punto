@@ -1,8 +1,10 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import SalesScreen from '@/app/(tabs)/sales';
-import { getBusinessProfile, listSales } from '@/db';
-import type { Sale } from '@/db';
+import { listActiveEmployees } from '@/auth';
+import type { PublicEmployee } from '@/auth';
+import { getBusinessProfile, listPaymentMethods, listSales } from '@/db';
+import type { PaymentMethod, Sale } from '@/db';
 import { i18n } from '@/i18n';
 
 const mockPush = jest.fn();
@@ -23,6 +25,11 @@ jest.mock('expo-router', () => ({
 jest.mock('@/db', () => ({
   getBusinessProfile: jest.fn(),
   listSales: jest.fn(),
+  listPaymentMethods: jest.fn(),
+}));
+
+jest.mock('@/auth', () => ({
+  listActiveEmployees: jest.fn(),
 }));
 
 jest.mock('expo-localization', () => ({
@@ -66,8 +73,35 @@ const sale = (overrides: Partial<Sale> = {}): Sale => ({
   ...overrides,
 });
 
+const paymentMethod = (overrides: Partial<PaymentMethod> = {}): PaymentMethod => ({
+  id: 'pm-cash',
+  businessId: 'biz-1',
+  name: 'Efectivo',
+  type: 'CASH',
+  isDefault: true,
+  isActive: true,
+  sortOrder: 0,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+const employee = (overrides: Partial<PublicEmployee> = {}): PublicEmployee => ({
+  id: 'emp-1',
+  businessId: 'biz-1',
+  firstName: 'Ana',
+  lastName: 'López',
+  username: 'ana',
+  role: 'ADMIN',
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
 const mockListSales = listSales as jest.MockedFunction<typeof listSales>;
 const mockGetProfile = getBusinessProfile as jest.MockedFunction<typeof getBusinessProfile>;
+const mockListPaymentMethods = listPaymentMethods as jest.MockedFunction<typeof listPaymentMethods>;
+const mockListEmployees = listActiveEmployees as jest.MockedFunction<typeof listActiveEmployees>;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -78,6 +112,8 @@ beforeEach(() => {
     items: [sale(), sale({ id: 'sale-2', saleNumber: 'S-000002', status: 'REFUNDED' })],
     nextCursor: null,
   });
+  mockListPaymentMethods.mockResolvedValue([paymentMethod()]);
+  mockListEmployees.mockResolvedValue([employee()]);
 });
 
 afterEach(async () => {
@@ -111,5 +147,36 @@ describe('SalesScreen', () => {
     await fireEvent.press(getByTestId('sales-filter-REFUNDED'));
 
     await waitFor(() => expect(mockListSales).toHaveBeenCalledWith({ status: 'REFUNDED' }));
+  });
+
+  it('refetches with a local date range when a date chip is selected', async () => {
+    const { getByTestId } = await render(<SalesScreen />);
+
+    await waitFor(() => expect(mockListSales).toHaveBeenCalledWith({}));
+
+    await fireEvent.press(getByTestId('sales-date-today'));
+
+    await waitFor(() =>
+      expect(mockListSales).toHaveBeenCalledWith(
+        expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
+      ),
+    );
+  });
+
+  it('refetches with a payment method filter when one is selected', async () => {
+    const { getByTestId, getByText } = await render(<SalesScreen />);
+
+    await waitFor(() => expect(mockListSales).toHaveBeenCalledWith({}));
+
+    await fireEvent.press(getByTestId('sales-method-trigger'));
+    expect(getByText('Efectivo')).toBeTruthy();
+
+    await fireEvent.press(getByTestId('sales-method-pm-cash'));
+
+    await waitFor(() =>
+      expect(mockListSales).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentMethodId: 'pm-cash' }),
+      ),
+    );
   });
 });

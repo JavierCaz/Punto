@@ -115,6 +115,14 @@ export default function MoreScreen() {
             title={t('more.purchases')}
             subtitle={t('more.purchasesSubtitle')}
             onPress={() => router.push('/purchases')}
+            divided
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+          />
+          <ListRow
+            icon="cash-minus"
+            title={t('more.expenses')}
+            subtitle={t('more.expensesSubtitle')}
+            onPress={() => router.push('/expenses')}
             trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
           />
         </ThemedView>

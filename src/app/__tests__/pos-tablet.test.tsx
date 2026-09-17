@@ -1,6 +1,6 @@
 import { render, waitFor } from '@testing-library/react-native';
 
-import PosScreen from '@/app/(tabs)/index';
+import PosScreen from '@/app/(tabs)/pos';
 import { ensureDefaultPaymentMethods, listSales } from '@/db';
 import { i18n } from '@/i18n';
 
@@ -32,6 +32,7 @@ jest.mock('@/db', () => ({
   removeSaleItem: jest.fn(),
   updateSaleItemQuantity: jest.fn(),
   ensureDefaultPaymentMethods: jest.fn(),
+  expireStaleHeldSales: jest.fn(async () => 0),
   listSales: jest.fn(),
 }));
 

@@ -252,7 +252,9 @@ export {
   checkoutSale,
   completeSale,
   createHeldSale,
+  expireStaleHeldSales,
   getSaleById,
+  HELD_SALE_TTL_HOURS,
   listSales,
   refundSale,
   removeSaleItem,
@@ -272,6 +274,7 @@ export type {
 export {
   createFinancialCategory,
   createFinancialTransaction,
+  ensureDefaultFinancialCategories,
   getFinancialCategoryById,
   getFinancialTransactionById,
   listFinancialCategories,
@@ -289,3 +292,19 @@ export type {
 
 // App metadata + document counters.
 export { getMetadata, nextPurchaseNumber, nextSaleNumber, setMetadata } from '@/db/repositories/app-metadata';
+
+// Analytics (Dashboard aggregates).
+export {
+  countHeldSales,
+  getCompletedSalesTotals,
+  getFinancialTotals,
+  getPurchaseExpenseTotal,
+  getRefundedSalesTotals,
+  listCompletedSalesInRange,
+  listTopProducts,
+} from '@/db/repositories/analytics';
+export type {
+  CompletedSalePoint,
+  PeriodTotals,
+  TopProduct,
+} from '@/db/repositories/analytics';

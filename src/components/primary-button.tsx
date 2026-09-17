@@ -14,16 +14,19 @@ export type PrimaryButtonProps = {
   icon?: MaterialIconName;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Test id forwarded to the pressable (for component tests). */
+  testID?: string;
 };
 
 /** High-emphasis action button (theme.primary fill, radius-md, ≥ TouchTarget.min). */
-export function PrimaryButton({ label, onPress, icon, disabled = false, style }: PrimaryButtonProps) {
+export function PrimaryButton({ label, onPress, icon, disabled = false, style, testID }: PrimaryButtonProps) {
   const theme = useTheme();
 
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
+      testID={testID}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,

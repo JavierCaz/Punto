@@ -17,6 +17,7 @@ import {
   checkoutSale,
   completeSale,
   createHeldSale,
+  expireStaleHeldSales,
   getSaleById,
   listSales,
   refundSale,
@@ -616,6 +617,45 @@ describe('sale repository', () => {
     });
   });
 
+  describe('expireStaleHeldSales', () => {
+    it('cancels stale HELD carts (never deletes) and returns the count', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+
+      const expired = await expireStaleHeldSales();
+
+      expect(expired).toBe(1); // RecordingAdapter reports 1 affected row
+      const updateCall = adapter.calls.find((c) => c.sql.includes('UPDATE sale'));
+      expect(updateCall).toBeDefined();
+      expect(updateCall!.sql).toContain("status = 'CANCELLED'");
+      expect(updateCall!.sql).toContain("status = 'HELD'");
+      expect(updateCall!.sql).toContain('created_at < ?');
+      expect(updateCall!.sql).not.toContain('DELETE');
+      // cancelled_at === updated_at; then businessId, then the ISO cutoff.
+      expect(updateCall!.params[0]).toBe(updateCall!.params[1]);
+      expect(updateCall!.params[2]).toBe('biz-1');
+      expect(typeof updateCall!.params[3]).toBe('string');
+    });
+
+    it('places the cutoff `ttlHours` in the past', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+
+      await expireStaleHeldSales(48);
+
+      const updateCall = adapter.calls.find((c) => c.sql.includes('UPDATE sale'));
+      const cutoff = new Date(String(updateCall!.params[3])).getTime();
+      const ageMs = Date.now() - cutoff;
+      expect(ageMs).toBeGreaterThanOrEqual(48 * 60 * 60 * 1000 - 5000);
+      expect(ageMs).toBeLessThanOrEqual(48 * 60 * 60 * 1000 + 5000);
+    });
+
+    it('rejects a non-positive TTL before touching the DB', async () => {
+      const error = await expireStaleHeldSales(0).catch((e: unknown) => e);
+
+      expect(isRepoError(error, REPO_ERROR.INVALID_STATE)).toBe(true);
+      expect(adapter.calls).toHaveLength(0);
+    });
+  });
+
   describe('refundSale', () => {
     it('posts positive RETURN movements inverting the original SALEs and flips status', async () => {
       adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
@@ -758,6 +798,19 @@ describe('sale repository', () => {
         '2026-02-01T00:00:00.000Z',
         50,
       ]);
+    });
+
+    it('binds paymentMethodId via an EXISTS subquery on payment', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueAll('FROM sale', []);
+
+      await listSales({ paymentMethodId: 'pm-cash' });
+
+      const call = adapter.calls.find((c) => c.sql.includes('FROM sale'));
+      expect(call!.sql).toContain(
+        'EXISTS (SELECT 1 FROM payment p WHERE p.sale_id = sale.id AND p.payment_method_id = ?)',
+      );
+      expect(call!.params).toEqual(['biz-1', 'pm-cash', 50]);
     });
   });
 });

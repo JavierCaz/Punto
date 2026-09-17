@@ -256,6 +256,8 @@ export interface SaleFilter extends PageQuery {
   employeeId?: string;
   from?: TimestampIso;
   to?: TimestampIso;
+  /** Only sales that include a payment made with this method. */
+  paymentMethodId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -904,6 +906,55 @@ async function cancelSaleWithTxn(
   }
 }
 
+/** Age (hours) after which an unpaid held cart is considered abandoned. */
+export const HELD_SALE_TTL_HOURS = 24;
+
+/**
+ * Cancel held carts older than `ttlHours` (default 24h) so an abandoned cart
+ * cannot nag the dashboard forever.
+ *
+ * Lossless by construction: stock is only consumed in `completeSale` and
+ * payments are only recorded there too, so a HELD cart holds no stock and no
+ * money. Expiring one flips it to CANCELLED (with `cancelled_at` stamped) and
+ * keeps the row as history — nothing is deleted.
+ *
+ * Idempotent and cheap (uses `idx_sale_business_date`), so callers may run it
+ * on every load. Returns the number of carts expired.
+ */
+export async function expireStaleHeldSales(ttlHours = HELD_SALE_TTL_HOURS): Promise<number> {
+  // Fail fast on a non-positive TTL before touching the DB.
+  if (ttlHours <= 0) {
+    throw repoError(REPO_ERROR.INVALID_STATE, 'ttlHours must be > 0');
+  }
+  const businessId = await getBusinessId();
+  return withTransaction((txn) => expireStaleHeldSalesWithTxn(txn, businessId, ttlHours));
+}
+
+async function expireStaleHeldSalesWithTxn(
+  txn: DatabaseAdapter,
+  businessId: string,
+  ttlHours: number,
+): Promise<number> {
+  const timestamp = nowIso();
+  // ISO-8601 UTC strings sort lexicographically, so a plain string comparison
+  // is the correct cutoff test.
+  const cutoff = new Date(Date.now() - ttlHours * 60 * 60 * 1000).toISOString();
+  try {
+    const result = await txn.runAsync(
+      `UPDATE sale
+          SET status = 'CANCELLED', cancelled_at = ?, updated_at = ?
+        WHERE business_id = ? AND status = 'HELD' AND created_at < ?`,
+      timestamp,
+      timestamp,
+      businessId,
+      cutoff,
+    );
+    return result.changes;
+  } catch (error) {
+    throw mapSqliteError(error);
+  }
+}
+
 /**
  * Refund a COMPLETED sale. Reads the original `SALE` movements for this sale
  * and posts inverting `RETURN` movements (positive signed quantity → stock
@@ -1010,6 +1061,15 @@ export async function listSales(filter: SaleFilter = {}): Promise<Page<Sale>> {
   if (filter.employeeId !== undefined) {
     clauses.push('employee_id = ?');
     params.push(filter.employeeId);
+  }
+  if (filter.paymentMethodId !== undefined) {
+    // EXISTS avoids joining `payment` (which would force qualifying every
+    // column in the SELECT/ORDER BY). A sale may split methods, so we match
+    // any of its payments.
+    clauses.push(
+      'EXISTS (SELECT 1 FROM payment p WHERE p.sale_id = sale.id AND p.payment_method_id = ?)',
+    );
+    params.push(filter.paymentMethodId);
   }
   if (filter.from !== undefined) {
     clauses.push('created_at >= ?');

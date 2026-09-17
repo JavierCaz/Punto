@@ -1,413 +1,286 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { listActiveEmployees, useAuthStore } from '@/auth';
-import { BottomSheet } from '@/components/bottom-sheet';
-import { CartPanel } from '@/components/cart-panel';
-import { CatalogFilterBar } from '@/components/catalog-filter-bar';
-import { EmptyState } from '@/components/empty-state';
-import { OptionRow } from '@/components/option-row';
-import { PaymentPanel } from '@/components/payment-panel';
-import { ProductCard } from '@/components/product-card';
-import { PulseHighlight } from '@/components/pulse-highlight';
+import { IncomeTrendChart } from '@/components/charts/income-trend-chart';
+import { TopProductsChart } from '@/components/charts/top-products-chart';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
+import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+
+import { HELD_SALE_TTL_HOURS } from '@/db';
 
 import { Radius, Spacing, TouchTarget } from '@/constants/theme';
-import {
-  cancelSale,
-  ensureDefaultPaymentMethods,
-  listSales,
-  type PaymentInput,
-  type PaymentMethod,
-  type Sale,
-} from '@/db';
-import { useCatalog } from '@/hooks/use-catalog';
+import { useDashboard } from '@/hooks/use-dashboard';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, formatDateTime, formatMoney } from '@/i18n/format';
-import { i18n } from '@/i18n';
-import { filterProducts } from '@/lib/catalog-form';
-import { cartItemCount, cartSubtotalMinor } from '@/pos/cart-math';
-import { useCartStore } from '@/pos/cart-store';
-
-const TABLET_BREAKPOINT = 768;
-const CART_PANE_WIDTH = 360;
-
-type ActiveSheet = 'none' | 'cart' | 'payment' | 'held' | 'employee';
-
-function fullName(firstName: string, lastName: string | null): string {
-  return lastName ? `${firstName} ${lastName}` : firstName;
-}
+import { formatDate, formatMoney } from '@/i18n/format';
+import { DASHBOARD_PERIODS, type DashboardPeriod } from '@/lib/dashboard';
 
 /**
- * POS — the primary daily task. Catalog on the left; on mobile a cart bar opens
- * the cart sheet (Catalog → Cart → Payment → Receipt), on tablet the cart lives
- * in a persistent split-view pane (§8.2).
+ * Resumen (Dashboard) — the owner's at-a-glance answer to "how is my business
+ * doing today and what should I do next?" (§5.2).
+ *
+ * Net is presented as NET CASH FLOW: completed sales + other income, minus
+ * refunds, manual expenses and supplier purchases (stock bought today). The
+ * line-item breakdown is always visible so a big purchase day is explainable
+ * rather than looking like a loss.
  */
-export default function PosScreen() {
+
+const PERIOD_LABEL_KEY = {
+  day: 'dashboard.period.day',
+  week: 'dashboard.period.week',
+  month: 'dashboard.period.month',
+  year: 'dashboard.period.year',
+  all: 'dashboard.period.all',
+} as const satisfies Record<DashboardPeriod, string>;
+
+/** Period selector chip (Day / Week / Month / Year / All). */
+function PeriodChip({
+  label,
+  selected,
+  testID,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  testID: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      testID={testID}
+      onPress={onPress}
+      style={[
+        styles.chip,
+        selected
+          ? { backgroundColor: theme.backgroundSelected, borderColor: theme.backgroundSelected }
+          : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+      ]}>
+      <ThemedText type="body2" themeColor={selected ? 'primary' : 'textSecondary'}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+export default function DashboardScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
-  const { width, height } = useWindowDimensions();
-  const isTablet = width >= TABLET_BREAKPOINT;
-
-  const { products, categories, recipeProductIds, productCostMinor, currency, loading, loadFailed, reload } =
-    useCatalog();
-  const user = useAuthStore((state) => state.user);
-
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [activeSheet, setActiveSheet] = useState<ActiveSheet>('none');
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [heldSales, setHeldSales] = useState<Sale[]>([]);
-  const [employees, setEmployees] = useState<Awaited<ReturnType<typeof listActiveEmployees>>>([]);
-  const [heldPulseToken, setHeldPulseToken] = useState(0);
-
-  const lines = useCartStore((state) => state.lines);
-  const busy = useCartStore((state) => state.busy);
-  const cartError = useCartStore((state) => state.error);
-  const cartEmployeeId = useCartStore((state) => state.employeeId);
-  const addProduct = useCartStore((state) => state.addProduct);
-  const resumeCart = useCartStore((state) => state.resume);
-  const checkout = useCartStore((state) => state.checkout);
-  const hold = useCartStore((state) => state.hold);
-  const setEmployee = useCartStore((state) => state.setEmployee);
-  const cartSaleId = useCartStore((state) => state.saleId);
-  const discardCart = useCartStore((state) => state.discard);
-
-  const today = formatDate(new Date().toISOString());
-  const count = cartItemCount(lines);
-  const cartTotal = cartSubtotalMinor(lines);
-
-  const isAdmin = user?.role === 'ADMIN';
-  const attributedEmployee = employees.find((employee) => employee.id === cartEmployeeId);
-  const employeeName = attributedEmployee
-    ? fullName(attributedEmployee.firstName, attributedEmployee.lastName)
-    : cartEmployeeId != null && cartEmployeeId === user?.id && user
-      ? fullName(user.firstName, user.lastName)
-      : null;
-
-  const loadHeld = useCallback(async () => {
-    try {
-      const page = await listSales({ status: 'HELD' });
-      setHeldSales(page.items);
-    } catch {
-      setHeldSales([]);
-    }
-  }, []);
-
-  const loadPaymentMethods = useCallback(async () => {
-    try {
-      const methods = await ensureDefaultPaymentMethods(i18n.language === 'en' ? 'en' : 'es');
-      setPaymentMethods(methods);
-    } catch {
-      setPaymentMethods([]);
-    }
-  }, []);
-
-
-  useEffect(() => {
-    setEmployee(user?.id ?? null);
-  }, [user?.id, setEmployee]);
+  const { model, loading, loadFailed, reload, period, setPeriod } = useDashboard();
 
   useFocusEffect(
     useCallback(() => {
       void reload();
-      void loadHeld();
-      void loadPaymentMethods();
-      void listActiveEmployees()
-        .then(setEmployees)
-        .catch(() => setEmployees([]));
-    }, [reload, loadHeld, loadPaymentMethods]),
+    }, [reload]),
   );
 
-  const visible = filterProducts(products, { search, categoryId: categoryFilter });
-  const resolveCategoryName = (categoryId: string | null): string | null =>
-    categories.find((category) => category.id === categoryId)?.name ?? null;
-
-  const handleAddProduct = (productId: string, name: string, priceMinor: number): void => {
-    void addProduct({
-      productId,
-      productName: name,
-      unitPriceMinor: priceMinor,
-      unitCostMinor: productCostMinor.get(productId) ?? 0,
-    });
-  };
-
-  const handlePaymentSubmit = async (payments: PaymentInput[]): Promise<void> => {
-    const detail = await checkout(payments);
-    if (!detail) {
-      return;
-    }
-    setActiveSheet('none');
-    await loadHeld();
-    // Defer past the sheet dismissal so iOS does not present while dismissing.
-    setTimeout(() => {
-      router.push({ pathname: '/receipt/[id]', params: { id: detail.id } });
-    }, 0);
-  };
-
-  const handleHold = async (): Promise<void> => {
-    await hold();
-    setActiveSheet('none');
-    await loadHeld();
-    setHeldPulseToken((token) => token + 1);
-  };
-
-  const resumeHeld = async (saleId: string): Promise<void> => {
-    await resumeCart(saleId);
-    setActiveSheet(isTablet ? 'none' : 'cart');
-  };
-
-  const discardHeld = async (saleId: string): Promise<void> => {
-    try {
-      if (saleId === cartSaleId) {
-        await discardCart();
-      } else {
-        await cancelSale(saleId);
-      }
-    } finally {
-      await loadHeld();
-    }
-  };
-
-  const chargeError =
-    cartError?.operation === 'charge'
-      ? cartError.code === 'INVENTORY_INSUFFICIENT_STOCK'
-        ? t('pos.payment.insufficientStock')
-        : t('pos.payment.failed')
-      : null;
-
-  const renderCatalogState = () => {
-    if (loading && products.length === 0) {
-      return (
+  if (loading && model === null) {
+    return (
+      <Screen underWebTabBar contentContainerStyle={styles.screen}>
         <View style={styles.state}>
           <ActivityIndicator color={theme.primary} />
           <ThemedText type="body2" themeColor="textSecondary">
             {t('common.status.loading')}
           </ThemedText>
         </View>
-      );
-    }
-    if (loadFailed && products.length === 0) {
-      return (
+      </Screen>
+    );
+  }
+
+  if (loadFailed && model === null) {
+    return (
+      <Screen underWebTabBar contentContainerStyle={styles.screen}>
         <View style={styles.state}>
-          <ThemedText type="body1">{t('common.status.error')}</ThemedText>
+          <ThemedText type="body1">{t('dashboard.loadFailed')}</ThemedText>
           <SecondaryButton label={t('common.actions.retry')} icon="refresh" onPress={() => void reload()} />
         </View>
-      );
-    }
-    if (products.length === 0) {
-      return (
-        <View style={styles.state}>
-          <EmptyState icon="shopping-outline" title={t('pos.empty.title')} message={t('pos.empty.message')} />
-        </View>
-      );
-    }
-    return null;
-  };
-
-  const catalogList = (
-    <FlatList
-      key={isTablet ? 'grid' : 'list'}
-      data={visible}
-      keyExtractor={(item) => item.id}
-      numColumns={isTablet ? 2 : 1}
-      {...(isTablet ? { columnWrapperStyle: styles.gridRow } : {})}
-      contentContainerStyle={styles.listContent}
-      style={styles.list}
-      showsVerticalScrollIndicator={false}
-      renderItem={({ item }) => (
-        <ProductCard
-          product={item}
-          categoryName={resolveCategoryName(item.categoryId)}
-          currency={currency}
-          hasRecipe={recipeProductIds.has(item.id)}
-          variant={isTablet ? 'grid' : 'list'}
-          onPress={() => handleAddProduct(item.id, item.name, item.priceMinor)}
-        />
-      )}
-      ListEmptyComponent={
-        <View style={styles.state}>
-          <ThemedText type="body2" themeColor="textSecondary">
-            {t('common.status.empty')}
-          </ThemedText>
-        </View>
-      }
-    />
-  );
-
-  const heldSheetContent =
-    heldSales.length === 0 ? (
-      <ThemedText type="body2" themeColor="textSecondary">
-        {t('pos.held.empty')}
-      </ThemedText>
-    ) : (
-      heldSales.map((held) => (
-        <View key={held.id} style={[styles.heldRow, { borderColor: theme.border }]}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void resumeHeld(held.id)}
-            testID={`held-sale-${held.id}`}
-            style={styles.heldMain}>
-            <ThemedText type="code">{held.saleNumber}</ThemedText>
-            <ThemedText type="body2" themeColor="textSecondary">
-              {formatDateTime(held.createdAt)}
-            </ThemedText>
-            <ThemedText type="code">{formatMoney(held.totalMinor, currency)}</ThemedText>
-          </Pressable>
-          <SecondaryButton label={t('pos.held.discard')} onPress={() => void discardHeld(held.id)} />
-        </View>
-      ))
+      </Screen>
     );
+  }
 
-  const employeeSheetContent = employees.map((employee, index) => (
-    <OptionRow
-      key={employee.id}
-      label={fullName(employee.firstName, employee.lastName)}
-      selected={cartEmployeeId === employee.id}
-      onPress={() => {
-        setEmployee(employee.id);
-        setActiveSheet('none');
-      }}
-      divided={index < employees.length - 1}
-    />
-  ));
+  if (model === null) {
+    return null;
+  }
 
-  const cartPanel = (
-    <CartPanel
-      currency={currency}
-      onCharge={() => setActiveSheet('payment')}
-      onHold={() => void handleHold()}
-      employeeName={employeeName}
-      {...(isAdmin ? { onChangeEmployee: () => setActiveSheet('employee') } : {})}
-    />
-  );
+  const {
+    totals,
+    currency,
+    salesCount,
+    averageTicketMinor,
+    trend,
+    granularity,
+    topProducts,
+    lowStock,
+    heldCount,
+  } = model;
+
+  const netColor = totals.netMinor < 0 ? theme.danger : theme.success;
+
+  const breakdown: { label: string; amount: number; sign: number }[] = [
+    { label: t('dashboard.salesLabel'), amount: model.salesMinor, sign: 1 },
+    { label: t('dashboard.purchasesLabel'), amount: model.purchaseExpenseMinor, sign: -1 },
+    { label: t('dashboard.manualExpensesLabel'), amount: model.manualExpenseMinor, sign: -1 },
+    { label: t('dashboard.refundsLabel'), amount: model.refundsMinor, sign: -1 },
+    { label: t('dashboard.otherIncomeLabel'), amount: model.otherIncomeMinor, sign: 1 },
+  ].filter((entry) => entry.amount > 0);
+
+  const hasProblems = lowStock.length > 0 || heldCount > 0;
 
   return (
-    <>
-      <Screen underWebTabBar contentContainerStyle={[styles.screen, isTablet ? styles.screenWide : null]}>
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <ThemedText type="heading1">{t('pos.title')}</ThemedText>
-            <ThemedText type="body2" themeColor="textSecondary">
-              {today}
-            </ThemedText>
-          </View>
-          {heldSales.length > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              testID="pos-held-button"
-              onPress={() => {
-                void loadHeld();
-                setActiveSheet('held');
-              }}
-              style={[styles.heldButton, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-              <PulseHighlight
-                token={heldPulseToken}
-                color={theme.warning}
-                borderRadius={Radius.md}
-                testID="pos-held-pulse"
-              />
-              <MaterialCommunityIcons name="clock-outline" size={18} color={theme.warning} />
-              <ThemedText type="body2">{heldSales.length}</ThemedText>
-            </Pressable>
-          ) : null}
-        </View>
+    <Screen scroll underWebTabBar contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <ThemedText type="heading1">{t('dashboard.title')}</ThemedText>
+        <ThemedText type="body2" themeColor="textSecondary">
+          {formatDate(new Date().toISOString())}
+        </ThemedText>
+      </View>
 
-        {products.length > 0 ? (
-          <CatalogFilterBar
-            search={search}
-            onSearchChange={setSearch}
-            categories={categories}
-            selectedCategoryId={categoryFilter}
-            onCategoryChange={setCategoryFilter}
-            searchPlaceholder={t('pos.searchPlaceholder')}
-            searchTestID="pos-search"
-          />
-        ) : null}
-
-        {isTablet ? (
-          <View style={styles.split}>
-            <View style={styles.catalogPane}>
-              {renderCatalogState() ?? catalogList}
-            </View>
-            <View style={[styles.cartPane, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-              {cartPanel}
-            </View>
-          </View>
-        ) : (
-          <>
-            {renderCatalogState() ?? catalogList}
-            {count > 0 ? (
+      {/* Needs your attention first: problems are actionable and point-in-time. */}
+      <View style={styles.section}>
+        <SectionHeader level="section" title={t('dashboard.problemsTitle')} />
+        {hasProblems ? (
+          <View style={styles.problems}>
+            {lowStock.length > 0 ? (
               <Pressable
                 accessibilityRole="button"
-                testID="pos-cart-bar"
-                onPress={() => setActiveSheet('cart')}
-                style={[styles.cartBar, { backgroundColor: theme.primary }]}>
-                <View style={styles.cartBarInfo}>
-                  <MaterialCommunityIcons name="cart-outline" size={20} color={theme.onPrimary} />
-                  <ThemedText style={{ color: theme.onPrimary }}>
-                    {t('pos.cart.itemCount', { count })}
+                testID="dashboard-low-stock"
+                onPress={() => router.navigate('/inventory')}
+                style={({ pressed }) => [
+                  styles.problemCard,
+                  { borderColor: theme.warning, backgroundColor: theme.backgroundElement },
+                  pressed && styles.pressed,
+                ]}>
+                <MaterialCommunityIcons name="alert-outline" size={22} color={theme.warning} />
+                <View style={styles.problemText}>
+                  <ThemedText type="body1">{t('dashboard.lowStockTitle')}</ThemedText>
+                  <ThemedText type="body2" themeColor="textSecondary">
+                    {t('dashboard.lowStockCount', { count: lowStock.length })}
                   </ThemedText>
                 </View>
-                <ThemedText type="code" style={{ color: theme.onPrimary }}>
-                  {formatMoney(cartTotal, currency)}
-                </ThemedText>
-                <ThemedText style={[styles.cartBarAction, { color: theme.onPrimary }]}>
-                  {t('pos.cart.open')}
+                <ThemedText type="body2" style={{ color: theme.primary }}>
+                  {t('dashboard.viewInventory')}
                 </ThemedText>
               </Pressable>
             ) : null}
-          </>
+
+            {heldCount > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                testID="dashboard-held-sales"
+                onPress={() => router.navigate('/pos')}
+                style={({ pressed }) => [
+                  styles.problemCard,
+                  { borderColor: theme.warning, backgroundColor: theme.backgroundElement },
+                  pressed && styles.pressed,
+                ]}>
+                <MaterialCommunityIcons name="clock-outline" size={22} color={theme.warning} />
+                <View style={styles.problemText}>
+                  <ThemedText type="body1">{t('dashboard.heldTitle')}</ThemedText>
+                  <ThemedText type="body2" themeColor="textSecondary">
+                    {t('dashboard.heldCount', { count: heldCount })}
+                  </ThemedText>
+                  <ThemedText type="micro" themeColor="textSecondary">
+                    {t('dashboard.heldHint', { hours: HELD_SALE_TTL_HOURS })}
+                  </ThemedText>
+                </View>
+                <ThemedText type="body2" style={{ color: theme.primary }}>
+                  {t('dashboard.viewHeld')}
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <ThemedText type="body2" themeColor="textSecondary">
+            {t('dashboard.noProblems')}
+          </ThemedText>
         )}
-      </Screen>
+      </View>
 
-      {!isTablet ? (
-        <BottomSheet
-          visible={activeSheet === 'cart'}
-          onClose={() => setActiveSheet('none')}
-          title={t('pos.cart.title')}
-          scroll={false}
-          testID="cart-sheet">
-          <View style={{ height: Math.round(height * 0.7) }}>{cartPanel}</View>
-        </BottomSheet>
-      ) : null}
+      {/* The period tabs scope the cash-flow figures, the trend and top products. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.periods}
+        contentContainerStyle={styles.periodsContent}>
+        {DASHBOARD_PERIODS.map((entry) => (
+          <PeriodChip
+            key={entry}
+            label={t(PERIOD_LABEL_KEY[entry])}
+            selected={entry === period}
+            testID={`dashboard-period-${entry}`}
+            onPress={() => setPeriod(entry)}
+          />
+        ))}
+      </ScrollView>
 
-      <BottomSheet
-        visible={activeSheet === 'payment'}
-        onClose={() => setActiveSheet('none')}
-        title={t('pos.payment.title')}
-        testID="payment-sheet">
-        <PaymentPanel
-          totalMinor={cartTotal}
-          currency={currency}
-          methods={paymentMethods}
-          submitting={busy}
-          errorMessage={chargeError}
-          onSubmit={(payments) => void handlePaymentSubmit(payments)}
-        />
-      </BottomSheet>
+      <ThemedView type="backgroundElement" style={[styles.netCard, { borderColor: theme.border }]}>
+        <ThemedText type="body2" themeColor="textSecondary">
+          {`${t('dashboard.netLabel')} · ${t(PERIOD_LABEL_KEY[period])}`}
+        </ThemedText>
+        <ThemedText type="display" testID="dashboard-net" style={{ color: netColor }}>
+          {formatMoney(totals.netMinor, currency)}
+        </ThemedText>
 
-      <BottomSheet
-        visible={activeSheet === 'held'}
-        onClose={() => setActiveSheet('none')}
-        title={t('pos.held.title')}
-        testID="held-sheet">
-        <View style={styles.heldList}>{heldSheetContent}</View>
-      </BottomSheet>
+        <View style={styles.netMeta}>
+          <ThemedText type="body2" themeColor="textSecondary">
+            {t('dashboard.salesCount', { count: salesCount })}
+          </ThemedText>
+          <ThemedText type="body2" themeColor="textSecondary">
+            {t('dashboard.averageTicket')}: {formatMoney(averageTicketMinor, currency)}
+          </ThemedText>
+        </View>
 
-      <BottomSheet
-        visible={activeSheet === 'employee'}
-        onClose={() => setActiveSheet('none')}
-        title={t('pos.cart.attributedTo')}
-        testID="employee-sheet">
-        <View>{employeeSheetContent}</View>
-      </BottomSheet>
-    </>
+        {breakdown.length > 0 ? (
+          <View style={[styles.breakdown, { borderTopColor: theme.border }]}>
+            {breakdown.map((entry) => (
+              <View key={entry.label} style={styles.breakdownRow}>
+                <ThemedText type="body2" themeColor="textSecondary">
+                  {entry.label}
+                </ThemedText>
+                <ThemedText
+                  type="code"
+                  style={{ color: entry.sign < 0 ? theme.danger : theme.success }}>
+                  {entry.sign < 0 ? '−' : '+'}
+                  {formatMoney(entry.amount, currency)}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </ThemedView>
+
+      <View style={styles.section}>
+        <SectionHeader level="section" title={t('dashboard.trendTitle')} />
+        <ThemedView type="backgroundElement" style={[styles.chartCard, { borderColor: theme.border }]}>
+          <IncomeTrendChart
+            data={trend}
+            granularity={granularity}
+            currency={currency}
+            testID="dashboard-trend-chart"
+          />
+        </ThemedView>
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader level="section" title={t('dashboard.topProductsTitle')} />
+        <ThemedView type="backgroundElement" style={[styles.chartCard, { borderColor: theme.border }]}>
+          {topProducts.length > 0 ? (
+            <TopProductsChart data={topProducts} testID="dashboard-top-products-chart" />
+          ) : (
+            <ThemedText type="body2" themeColor="textSecondary">
+              {t('dashboard.topProductsEmpty')}
+            </ThemedText>
+          )}
+        </ThemedView>
+      </View>
+    </Screen>
   );
 }
 
@@ -416,52 +289,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.three,
   },
-  screenWide: {
-    maxWidth: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-  },
-  headerText: {
-    gap: Spacing.one,
-  },
-  heldButton: {
-    minHeight: TouchTarget.min,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    overflow: 'hidden',
-  },
-  split: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: Spacing.three,
-  },
-  catalogPane: {
-    flex: 1,
-    gap: Spacing.three,
-  },
-  cartPane: {
-    width: CART_PANE_WIDTH,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.three,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
+  // Scrollable content container: no `flex: 1` (which would clamp the content
+  // to the viewport height and defeat scrolling).
+  content: {
     gap: Spacing.three,
     paddingBottom: Spacing.five,
   },
-  gridRow: {
-    gap: Spacing.three,
+  header: {
+    gap: Spacing.one,
   },
   state: {
     flex: 1,
@@ -470,36 +305,73 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingVertical: Spacing.five,
   },
-  cartBar: {
-    minHeight: TouchTarget.action,
+  periods: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  periodsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  chip: {
+    minHeight: 36,
+    justifyContent: 'center',
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+  },
+  netCard: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three,
+    gap: Spacing.one,
+  },
+  netMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+    marginTop: Spacing.one,
+  },
+  breakdown: {
+    marginTop: Spacing.two,
+    paddingTop: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.one,
+  },
+  breakdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.three,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.three,
   },
-  cartBarInfo: {
+  section: {
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  problems: {
+    gap: Spacing.two,
+  },
+  problemCard: {
+    minHeight: TouchTarget.min,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-  },
-  cartBarAction: {
-    fontWeight: '700',
-  },
-  heldList: {
-    gap: Spacing.two,
-  },
-  heldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.md,
+    gap: Spacing.three,
+    borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
   },
-  heldMain: {
+  problemText: {
     flex: 1,
     gap: Spacing.half,
+  },
+  chartCard: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.three,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });

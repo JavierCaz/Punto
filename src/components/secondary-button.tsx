@@ -13,6 +13,8 @@ export type SecondaryButtonProps = {
   icon?: MaterialIconName;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Test id forwarded to the pressable (for component tests). */
+  testID?: string;
 };
 
 /** Medium-emphasis action button (backgroundElement fill + hairline border). */
@@ -22,6 +24,7 @@ export function SecondaryButton({
   icon,
   disabled = false,
   style,
+  testID,
 }: SecondaryButtonProps) {
   const theme = useTheme();
 
@@ -29,6 +32,7 @@ export function SecondaryButton({
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
+      testID={testID}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,

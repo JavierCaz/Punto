@@ -539,3 +539,88 @@ export async function listFinancialTransactions(
 
   return { items, nextCursor };
 }
+
+
+// ===========================================================================
+// Default category seeding
+// ===========================================================================
+
+/** Locale keys for the seeded categories (Spanish is canonical). */
+type DefaultFinancialCategoryLanguage = 'es' | 'en';
+
+/**
+ * Canonical categories a fresh business starts with. Expense categories cover
+ * the everyday money-out an owner records by hand (supplies, rent, …); the
+ * single income category covers money in that is not a sale.
+ *
+ * Names are localized at seed time so a Spanish-first business sees Spanish
+ * labels. Rows are seeded with `is_system = 1` (seed-owned, not editable —
+ * see `updateFinancialCategory`).
+ */
+const DEFAULT_FINANCIAL_CATEGORIES: readonly {
+  type: FinanceType;
+  name: Record<DefaultFinancialCategoryLanguage, string>;
+}[] = [
+  { type: 'EXPENSE', name: { es: 'Insumos', en: 'Supplies' } },
+  { type: 'EXPENSE', name: { es: 'Renta', en: 'Rent' } },
+  { type: 'EXPENSE', name: { es: 'Servicios', en: 'Utilities' } },
+  { type: 'EXPENSE', name: { es: 'Nómina', en: 'Payroll' } },
+  { type: 'EXPENSE', name: { es: 'Otros gastos', en: 'Other expenses' } },
+  { type: 'INCOME', name: { es: 'Otros ingresos', en: 'Other income' } },
+];
+
+/**
+ * Ensure a business has its default financial categories.
+ *
+ * Seeding only happens when the business has NO categories at all: once an
+ * owner has any category, Punto never injects more (this keeps the seed from
+ * re-adding localized duplicates after a language switch and respects a
+ * business that deliberately curated its own list). Called lazily by the
+ * expense screen before listing categories.
+ */
+export async function ensureDefaultFinancialCategories(
+  language: DefaultFinancialCategoryLanguage = 'es',
+): Promise<FinancialCategory[]> {
+  const businessId = await getBusinessId();
+  return withTransaction(async (txn) => {
+    const existing = await txn.getAllAsync<Record<string, unknown>>(
+      `SELECT ${FINANCIAL_CATEGORY_COLUMNS} FROM financial_category WHERE business_id = ?`,
+      businessId,
+    );
+    if (existing.length > 0) {
+      return existing.map((row) => toFinancialCategory(mapFinancialCategoryRow(row)));
+    }
+
+    const timestamp = nowIso();
+    for (const definition of DEFAULT_FINANCIAL_CATEGORIES) {
+      const id = newId();
+      try {
+        await txn.runAsync(
+          `INSERT INTO financial_category
+             (id, business_id, name, type, is_system, is_active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
+          id,
+          businessId,
+          definition.name[language],
+          definition.type,
+          timestamp,
+          timestamp,
+        );
+      } catch (error) {
+        throw mapSqliteError(error);
+      }
+      existing.push({
+        id,
+        business_id: businessId,
+        name: definition.name[language],
+        type: definition.type,
+        is_system: 1,
+        is_active: 1,
+        created_at: timestamp,
+        updated_at: timestamp,
+      });
+    }
+
+    return existing.map((row) => toFinancialCategory(mapFinancialCategoryRow(row)));
+  });
+}

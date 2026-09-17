@@ -5,7 +5,7 @@
 
 import { render, waitFor } from '@testing-library/react-native';
 
-import PosScreen from '@/app/(tabs)/index';
+import PosScreen from '@/app/(tabs)/pos';
 import { i18n } from '@/i18n';
 
 jest.mock('expo-localization', () => ({

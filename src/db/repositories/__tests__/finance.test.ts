@@ -12,6 +12,7 @@ import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
 import {
   createFinancialCategory,
   createFinancialTransaction,
+  ensureDefaultFinancialCategories,
   getFinancialCategoryById,
   getFinancialTransactionById,
   listFinancialCategories,
@@ -464,5 +465,45 @@ describe('finance repository', () => {
       expect(call!.sql).toContain('ft.category_id = ?');
       expect(call!.params).toEqual(['biz-1', 'cat-1', 50]);
     });
+  });
+});
+
+
+describe('ensureDefaultFinancialCategories', () => {
+  let adapter: RecordingAdapter;
+
+  beforeEach(() => {
+    adapter = new RecordingAdapter();
+    (getDb as jest.Mock).mockResolvedValue(makeFakeDb(adapter));
+    resetBusinessIdForTesting();
+  });
+
+  it('seeds localized system categories when the business has none', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM financial_category', []);
+
+    const result = await ensureDefaultFinancialCategories('es');
+
+    expect(result).toHaveLength(6);
+    expect(result.filter((category) => category.type === 'EXPENSE')).toHaveLength(5);
+    expect(result.filter((category) => category.type === 'INCOME')).toHaveLength(1);
+    expect(result.every((category) => category.isSystem)).toBe(true);
+    expect(result.map((category) => category.name)).toContain('Renta');
+    expect(result.map((category) => category.name)).toContain('Otros ingresos');
+
+    const inserts = adapter.calls.filter((call) => call.sql.includes('INSERT INTO financial_category'));
+    expect(inserts).toHaveLength(6);
+    // is_system = 1 for every seeded row; business id bound on each.
+    expect(inserts[0].params[1]).toBe('biz-1');
+  });
+
+  it('never injects duplicates once the business has categories', async () => {
+    adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+    adapter.queueAll('FROM financial_category', [CATEGORY_ROW]);
+
+    const result = await ensureDefaultFinancialCategories('en');
+
+    expect(result).toHaveLength(1);
+    expect(adapter.calls.some((call) => call.sql.includes('INSERT INTO financial_category'))).toBe(false);
   });
 });

@@ -14,22 +14,36 @@ import { REPO_ERROR, repoError } from '@/db/repositories/errors';
  * surface therefore throws `REPO_NO_BUSINESS` instead of returning a nullable.
  */
 let cachedBusinessId: string | null = null;
+let businessIdPromise: Promise<string> | null = null;
 
 /** Return the single business id, memoized. Throws `REPO_NO_BUSINESS` if none. */
 export async function getBusinessId(): Promise<string> {
   if (cachedBusinessId !== null) return cachedBusinessId;
 
-  const db = await getDb();
-  const row = await db.getFirstAsync<{ id: string }>('SELECT id FROM business LIMIT 1');
-  if (!row) {
-    throw repoError(REPO_ERROR.NO_BUSINESS);
+  // Cache the IN-FLIGHT lookup too, not just the resolved value: screens load
+  // several repositories in parallel (Promise.all), and each would otherwise
+  // race past the null check and issue its own `SELECT id FROM business`.
+  if (businessIdPromise === null) {
+    businessIdPromise = (async () => {
+      const db = await getDb();
+      const row = await db.getFirstAsync<{ id: string }>('SELECT id FROM business LIMIT 1');
+      if (!row) {
+        throw repoError(REPO_ERROR.NO_BUSINESS);
+      }
+      cachedBusinessId = row.id;
+      return cachedBusinessId;
+    })().catch((error) => {
+      // Drop the failed promise so a later call retries instead of rejecting
+      // forever.
+      businessIdPromise = null;
+      throw error;
+    });
   }
-
-  cachedBusinessId = row.id;
-  return cachedBusinessId;
+  return businessIdPromise;
 }
 
 /** Test helper: clear the memo so the next `getBusinessId()` re-queries. */
 export function resetBusinessIdForTesting(): void {
   cachedBusinessId = null;
+  businessIdPromise = null;
 }

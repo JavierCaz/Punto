@@ -7,15 +7,17 @@ import { useTheme } from '@/hooks/use-theme';
 
 type TabIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-const TABS: { name: 'index' | 'sales' | 'inventory' | 'more'; icon: TabIconName }[] = [
-  { name: 'index', icon: 'point-of-sale' },
+const TABS: { name: 'index' | 'pos' | 'sales' | 'inventory' | 'more'; icon: TabIconName }[] = [
+  { name: 'index', icon: 'view-dashboard-outline' },
+  { name: 'pos', icon: 'point-of-sale' },
   { name: 'sales', icon: 'receipt-text-outline' },
   { name: 'inventory', icon: 'package-variant-closed' },
   { name: 'more', icon: 'dots-horizontal' },
 ];
 
 const TAB_LABEL_KEY = {
-  index: 'tabs.pos',
+  index: 'tabs.dashboard',
+  pos: 'tabs.pos',
   sales: 'tabs.sales',
   inventory: 'tabs.inventory',
   more: 'tabs.more',
