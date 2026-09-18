@@ -19,7 +19,6 @@ import {
   parseMoneyInput,
   parseQuantityMilli,
   reorderCategories,
-  resolveStockMode,
   validateProductForm,
   type ProductFormValues,
 } from '@/lib/catalog-form';
@@ -68,7 +67,7 @@ function makeValues(overrides: Partial<ProductFormValues> = {}): ProductFormValu
     imageUri: null,
     priceInput: '12.50',
     barcode: '',
-    trackInventory: false,
+    stockMode: 'none',
     inventoryItemId: null,
     recipeItems: [],
     supplierId: null,
@@ -123,23 +122,6 @@ describe('quantity helpers', () => {
   });
 });
 
-describe('resolveStockMode', () => {
-  it('resolves none, direct and recipe', () => {
-    expect(resolveStockMode({ trackInventory: false, inventoryItemId: null, recipeItems: [] })).toBe(
-      'none',
-    );
-    expect(
-      resolveStockMode({ trackInventory: true, inventoryItemId: 'inv-1', recipeItems: [] }),
-    ).toBe('direct');
-    expect(
-      resolveStockMode({
-        trackInventory: true,
-        inventoryItemId: null,
-        recipeItems: [{ inventoryItemId: 'inv-1', quantityInput: '1' }],
-      }),
-    ).toBe('recipe');
-  });
-});
 
 describe('validateProductForm', () => {
   it('accepts a minimal valid product', () => {
@@ -153,27 +135,35 @@ describe('validateProductForm', () => {
     expect(validateProductForm(makeValues({ priceInput: 'nope' })).price).toBe('price-invalid');
   });
 
-  it('requires a stock source when tracking is on', () => {
-    const result = validateProductForm(makeValues({ trackInventory: true }));
+  it('requires a direct stock item when direct mode is selected', () => {
+    const result = validateProductForm(makeValues({ stockMode: 'direct' }));
     expect(result.stock).toBe('stock-required');
     expect(result.valid).toBe(false);
   });
 
-  it('rejects a direct stock item combined with a recipe', () => {
-    const result = validateProductForm(
-      makeValues({
-        trackInventory: true,
-        inventoryItemId: 'inv-1',
-        recipeItems: [{ inventoryItemId: 'inv-2', quantityInput: '1' }],
-      }),
-    );
-    expect(result.stock).toBe('recipe-conflict');
+  it('requires at least one recipe line in recipe mode', () => {
+    const result = validateProductForm(makeValues({ stockMode: 'recipe' }));
+    expect(result.stock).toBe('stock-required');
+    expect(result.valid).toBe(false);
   });
 
-  it('validates recipe lines', () => {
+  it('does not require stock inputs in none mode', () => {
+    const result = validateProductForm(
+      makeValues({
+        stockMode: 'none',
+        inventoryItemId: null,
+        recipeItems: [{ inventoryItemId: null, quantityInput: '0' }],
+      }),
+    );
+    expect(result.stock).toBeNull();
+    expect(result.recipe).toBeNull();
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates recipe lines in recipe mode', () => {
     const invalid = validateProductForm(
       makeValues({
-        trackInventory: true,
+        stockMode: 'recipe',
         recipeItems: [{ inventoryItemId: null, quantityInput: '1' }],
       }),
     );
@@ -181,7 +171,7 @@ describe('validateProductForm', () => {
 
     const zero = validateProductForm(
       makeValues({
-        trackInventory: true,
+        stockMode: 'recipe',
         recipeItems: [{ inventoryItemId: 'inv-1', quantityInput: '0' }],
       }),
     );
@@ -189,7 +179,7 @@ describe('validateProductForm', () => {
 
     const duplicate = validateProductForm(
       makeValues({
-        trackInventory: true,
+        stockMode: 'recipe',
         recipeItems: [
           { inventoryItemId: 'inv-1', quantityInput: '1' },
           { inventoryItemId: 'inv-1', quantityInput: '2' },
@@ -197,17 +187,6 @@ describe('validateProductForm', () => {
       }),
     );
     expect(duplicate.recipe).toBe('recipe-duplicate');
-  });
-
-  it('ignores leftover recipe lines when tracking is off', () => {
-    const result = validateProductForm(
-      makeValues({
-        trackInventory: false,
-        recipeItems: [{ inventoryItemId: null, quantityInput: '0' }],
-      }),
-    );
-    expect(result.recipe).toBeNull();
-    expect(result.valid).toBe(true);
   });
 });
 
@@ -229,7 +208,7 @@ describe('buildProductCreateInput', () => {
 
   it('omits the stock bridge unless direct tracking is selected', () => {
     const direct = buildProductCreateInput(
-      makeValues({ trackInventory: true, inventoryItemId: 'inv-1' }),
+      makeValues({ stockMode: 'direct', inventoryItemId: 'inv-1' }),
     );
     expect(direct.inventoryItemId).toBe('inv-1');
   });
@@ -247,7 +226,7 @@ describe('buildProductUpdateInput', () => {
 
   it('keeps the direct stock bridge only when selected', () => {
     const input = buildProductUpdateInput(
-      makeValues({ trackInventory: true, inventoryItemId: 'inv-1' }),
+      makeValues({ stockMode: 'direct', inventoryItemId: 'inv-1' }),
     );
     expect(input.inventoryItemId).toBe('inv-1');
   });

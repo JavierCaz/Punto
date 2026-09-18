@@ -19,7 +19,6 @@ import {
   buildProductCreateInput,
   buildProductUpdateInput,
   buildRecipeItems,
-  resolveStockMode,
   type ProductFormValues,
 } from '@/lib/catalog-form';
 import { deleteProductImage } from '@/lib/product-image';
@@ -143,7 +142,7 @@ export async function saveProduct(
   values: ProductFormValues,
   existing?: ExistingProduct | null,
 ): Promise<Product> {
-  const mode = resolveStockMode(values);
+  const mode = values.stockMode;
 
   if (!existing) {
     return createProductWithStock(buildProductCreateInput(values), {

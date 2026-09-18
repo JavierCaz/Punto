@@ -8,8 +8,8 @@ import { PrimaryButton } from './primary-button';
 import { ProductImagePicker, type ProductImageError } from './product-image-picker';
 import { RecipeEditor } from './recipe-editor';
 import { SecondaryButton } from './secondary-button';
+import { SegmentedControl } from './segmented-control';
 import { SelectField } from './select-field';
-import { SwitchRow } from './switch-row';
 import { ThemedText } from './themed-text';
 
 import { Spacing } from '@/constants/theme';
@@ -19,6 +19,7 @@ import {
   validateProductForm,
   type ProductFormIssue,
   type ProductFormValues,
+  type ProductStockMode,
   type RecipeLineValue,
 } from '@/lib/catalog-form';
 
@@ -37,9 +38,10 @@ export type ProductFormProps = {
 
 /**
  * Product create/edit form implementing progressive disclosure (§5.3):
- * the initial fields are name, image, category, price and the inventory
- * toggle; description, barcode, stock item, recipe and supplier live behind
- * "Opciones avanzadas".
+ * name, image, category, price and the explicit stock-mode segmented control
+ * (none / direct / recipe) come first; the mode's own inputs (stock item +
+ * supplier, or recipe editor) sit directly below it, and description + barcode
+ * stay behind "Opciones avanzadas" at the end of the form.
  *
  * Validation and payload building are pure (`@/lib/catalog-form`); this
  * component owns only the controlled field state and error presentation.
@@ -75,9 +77,12 @@ export function ProductForm({
     initialProduct ? formatMoneyInput(initialProduct.priceMinor) : '',
   );
   const [barcode, setBarcode] = useState(initialProduct?.barcode ?? '');
-  const [trackInventory, setTrackInventory] = useState(
-    initialProduct != null &&
-      (initialProduct.inventoryItemId != null || (initialRecipeItems?.length ?? 0) > 0),
+  const [stockMode, setStockMode] = useState<ProductStockMode>(
+    (initialRecipeItems?.length ?? 0) > 0
+      ? 'recipe'
+      : initialProduct?.inventoryItemId != null
+        ? 'direct'
+        : 'none',
   );
   const [inventoryItemId, setInventoryItemId] = useState<string | null>(
     initialProduct?.inventoryItemId ?? null,
@@ -95,7 +100,7 @@ export function ProductForm({
       imageUri,
       priceInput,
       barcode,
-      trackInventory,
+      stockMode,
       inventoryItemId,
       recipeItems,
       supplierId,
@@ -107,7 +112,7 @@ export function ProductForm({
       imageUri,
       priceInput,
       barcode,
-      trackInventory,
+      stockMode,
       inventoryItemId,
       recipeItems,
       supplierId,
@@ -125,13 +130,13 @@ export function ProductForm({
       case 'price-invalid':
         return t('products.form.priceInvalid');
       case 'stock-required':
-        return t('products.form.stockRequired');
+        return stockMode === 'direct'
+          ? t('products.form.stockItemRequired')
+          : t('products.form.recipeRequired');
       case 'recipe-invalid':
         return t('products.form.recipeInvalid');
       case 'recipe-duplicate':
         return t('products.form.recipeDuplicate');
-      case 'recipe-conflict':
-        return t('products.form.recipeConflict');
       default:
         return undefined;
     }
@@ -148,6 +153,16 @@ export function ProductForm({
       return;
     }
     onSave(values);
+  };
+
+  const handleStockModeChange = (mode: ProductStockMode): void => {
+    setStockMode(mode);
+    if (mode === 'direct') {
+      setRecipeItems([]);
+    } else if (mode === 'recipe') {
+      setInventoryItemId(null);
+      setSupplierId(null);
+    }
   };
 
   const categoryOptions = categories.map((category) => ({
@@ -210,13 +225,53 @@ export function ProductForm({
         testID="product-price"
       />
 
-      <SwitchRow
+      <SegmentedControl
         label={t('products.form.trackInventoryLabel')}
         hint={t('products.form.trackInventoryHint')}
-        value={trackInventory}
-        onValueChange={setTrackInventory}
-        testID="product-track-inventory"
+        value={stockMode}
+        onChange={handleStockModeChange}
+        options={[
+          { value: 'none', label: t('products.form.stockModeNone') },
+          { value: 'direct', label: t('products.form.stockModeDirect') },
+          { value: 'recipe', label: t('products.form.stockModeRecipe') },
+        ]}
+        testIDPrefix="product-stock-mode"
       />
+
+      {stockMode === 'direct' ? (
+        <>
+          <SelectField
+            label={t('products.form.stockLabel')}
+            hint={t('products.form.stockHint')}
+            items={inventoryOptions}
+            value={inventoryItemId}
+            onChange={setInventoryItemId}
+            noneLabel={t('products.form.stockNone')}
+            testIDPrefix="product-stock"
+          />
+
+          {inventoryItemId != null ? (
+            <SelectField
+              label={t('products.form.supplierLabel')}
+              hint={t('products.form.supplierHint')}
+              items={supplierOptions}
+              value={supplierId}
+              onChange={setSupplierId}
+              noneLabel={t('products.form.supplierNone')}
+              testIDPrefix="product-supplier"
+            />
+          ) : null}
+        </>
+      ) : null}
+
+      {stockMode === 'recipe' ? (
+        <RecipeEditor
+          items={recipeItems}
+          inventoryItems={inventoryItems}
+          onChange={setRecipeItems}
+          error={submitted ? issueMessage(validation.recipe) : undefined}
+        />
+      ) : null}
 
       <AdvancedSection
         title={t('products.form.advancedTitle')}
@@ -241,39 +296,6 @@ export function ProductForm({
           autoCapitalize="sentences"
           testID="product-description"
         />
-
-        {trackInventory ? (
-          <>
-            <SelectField
-              label={t('products.form.stockLabel')}
-              hint={t('products.form.stockHint')}
-              items={inventoryOptions}
-              value={inventoryItemId}
-              onChange={setInventoryItemId}
-              noneLabel={t('products.form.stockNone')}
-              testIDPrefix="product-stock"
-            />
-
-            {inventoryItemId != null ? (
-              <SelectField
-                label={t('products.form.supplierLabel')}
-                hint={t('products.form.supplierHint')}
-                items={supplierOptions}
-                value={supplierId}
-                onChange={setSupplierId}
-                noneLabel={t('products.form.supplierNone')}
-                testIDPrefix="product-supplier"
-              />
-            ) : null}
-
-            <RecipeEditor
-              items={recipeItems}
-              inventoryItems={inventoryItems}
-              onChange={setRecipeItems}
-              error={submitted ? issueMessage(validation.recipe) : undefined}
-            />
-          </>
-        ) : null}
       </AdvancedSection>
 
       {submitted && validation.stock ? (

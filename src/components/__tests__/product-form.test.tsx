@@ -159,17 +159,39 @@ describe('ProductForm', () => {
     expect(getByTestId('product-barcode')).toBeTruthy();
   });
 
-  it('requires a stock source when inventory tracking is enabled', async () => {
+  it('requires a direct stock item when direct mode is selected', async () => {
     const onSave = jest.fn();
     const { getByText, getByTestId } = await renderForm(onSave);
 
     await fireEvent.changeText(getByTestId('product-name'), 'Matcha Latte');
     await fireEvent.changeText(getByTestId('product-price'), '12.50');
-    await fireEvent(getByTestId('product-track-inventory'), 'valueChange', true);
+    await fireEvent.press(getByTestId('product-stock-mode-direct'));
     await fireEvent.press(getByText('Guardar'));
 
-    expect(getByText('Elige cómo controlar el inventario.')).toBeTruthy();
+    expect(getByText('Elige el artículo que se descuenta.')).toBeTruthy();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('reveals the recipe editor in recipe mode and hides the direct inputs', async () => {
+    const { getByText, getByTestId, queryByTestId } = await renderForm();
+
+    await fireEvent.press(getByTestId('product-stock-mode-recipe'));
+    await fireEvent.press(getByText('Opciones avanzadas'));
+
+    expect(getByText('Agregar ingrediente')).toBeTruthy();
+    expect(queryByTestId('product-stock-trigger')).toBeNull();
+    expect(queryByTestId('product-supplier-trigger')).toBeNull();
+  });
+
+  it('shows neither stock input in none mode', async () => {
+    const { getByText, getByTestId, queryByTestId, queryByText } = await renderForm();
+
+    await fireEvent.press(getByTestId('product-stock-mode-none'));
+    await fireEvent.press(getByText('Opciones avanzadas'));
+
+    expect(queryByTestId('product-stock-trigger')).toBeNull();
+    expect(queryByText('Agregar ingrediente')).toBeNull();
+    expect(getByTestId('product-barcode')).toBeTruthy();
   });
 
   it('renders English copy when the active language is en', async () => {

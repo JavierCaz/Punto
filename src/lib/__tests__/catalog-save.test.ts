@@ -64,7 +64,7 @@ const baseProductValues: ProductFormValues = {
   imageUri: null,
   priceInput: '25.00',
   barcode: '',
-  trackInventory: false,
+  stockMode: 'none',
   inventoryItemId: null,
   recipeItems: [],
   supplierId: null,
@@ -130,7 +130,7 @@ describe('saveProduct', () => {
   it('creates through the atomic composite with the recipe when tracked by recipe', async () => {
     await saveProduct({
       ...baseProductValues,
-      trackInventory: true,
+      stockMode: 'recipe',
       recipeItems: [{ inventoryItemId: 'item-1', quantityInput: '0.2' }],
     });
 
@@ -150,7 +150,7 @@ describe('saveProduct', () => {
     await saveProduct(
       {
         ...baseProductValues,
-        trackInventory: true,
+        stockMode: 'direct',
         inventoryItemId: 'item-1',
         supplierId: 'sup-1',
       },
@@ -173,7 +173,7 @@ describe('saveProduct', () => {
     await saveProduct(
       {
         ...baseProductValues,
-        trackInventory: true,
+        stockMode: 'recipe',
         recipeItems: [{ inventoryItemId: 'item-1', quantityInput: '0.2' }],
       },
       existing,

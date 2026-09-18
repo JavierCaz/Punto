@@ -10657,7 +10657,7 @@
       "file_type": "code",
       "norm_label": "productform()",
       "source_file": "src/components/product-form.tsx",
-      "source_location": "L49"
+      "source_location": "L48"
     },
     {
       "id": "src_components_screen_screen",
@@ -14112,7 +14112,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/components/product-form.tsx",
-      "source_location": "L332"
+      "source_location": "L331"
     },
     {
       "id": "src_components_product_image_picker",
@@ -28485,7 +28485,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/product-form.tsx",
-      "source_location": "L122",
+      "source_location": "L121",
       "weight": 1.0
     },
     {
@@ -28497,7 +28497,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/components/product-form.tsx",
-      "source_location": "L77",
+      "source_location": "L76",
       "weight": 1.0
     },
     {
@@ -95447,7 +95447,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/product-form.tsx",
-      "source_location": "L332",
+      "source_location": "L331",
       "weight": 1.0
     },
     {
@@ -95458,7 +95458,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/components/product-form.tsx",
-      "source_location": "L49",
+      "source_location": "L48",
       "weight": 1.0
     },
     {

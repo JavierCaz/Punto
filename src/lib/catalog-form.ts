@@ -113,7 +113,7 @@ export interface RecipeLineValue {
   quantityInput: string;
 }
 
-/** How a product's stock is tracked, derived from the form values. */
+/** How a product's stock is tracked; chosen explicitly in the form. */
 export type ProductStockMode = 'none' | 'direct' | 'recipe';
 
 export interface ProductFormValues {
@@ -123,7 +123,8 @@ export interface ProductFormValues {
   imageUri: string | null;
   priceInput: string;
   barcode: string;
-  trackInventory: boolean;
+  /** Explicit stock mechanism chosen in the form. */
+  stockMode: ProductStockMode;
   /** Direct-stock bridge (`product.inventory_item_id`). */
   inventoryItemId: string | null;
   recipeItems: RecipeLineValue[];
@@ -138,8 +139,7 @@ export type ProductFormIssue =
   | 'price-invalid'
   | 'stock-required'
   | 'recipe-invalid'
-  | 'recipe-duplicate'
-  | 'recipe-conflict';
+  | 'recipe-duplicate';
 
 export interface ProductFormValidation {
   name: ProductFormIssue | null;
@@ -147,25 +147,6 @@ export interface ProductFormValidation {
   stock: ProductFormIssue | null;
   recipe: ProductFormIssue | null;
   valid: boolean;
-}
-
-/**
- * Resolve the stock mechanism: a product sells EITHER by decrementing a direct
- * stock item OR via a recipe — never both (migration 001 XOR invariant).
- */
-export function resolveStockMode(
-  values: Pick<ProductFormValues, 'trackInventory' | 'inventoryItemId' | 'recipeItems'>,
-): ProductStockMode {
-  if (!values.trackInventory) {
-    return 'none';
-  }
-  if (values.recipeItems.length > 0) {
-    return 'recipe';
-  }
-  if (values.inventoryItemId != null) {
-    return 'direct';
-  }
-  return 'none';
 }
 
 /** Validate the product form, returning issue codes per field. */
@@ -181,37 +162,34 @@ export function validateProductForm(values: ProductFormValues): ProductFormValid
     price = 'price-invalid';
   }
 
-  const hasRecipe = values.recipeItems.length > 0;
-  const hasDirect = values.inventoryItemId != null;
-
   let stock: ProductFormIssue | null = null;
   let recipe: ProductFormIssue | null = null;
 
-  if (values.trackInventory) {
-    if (!hasRecipe && !hasDirect) {
+  if (values.stockMode === 'direct') {
+    if (values.inventoryItemId == null) {
       stock = 'stock-required';
-    } else if (hasRecipe && hasDirect) {
-      stock = 'recipe-conflict';
     }
-  }
-
-  if (hasRecipe && values.trackInventory) {
-    const seen = new Set<string>();
-    for (const line of values.recipeItems) {
-      if (line.inventoryItemId == null) {
-        recipe = 'recipe-invalid';
-        break;
+  } else if (values.stockMode === 'recipe') {
+    if (values.recipeItems.length === 0) {
+      stock = 'stock-required';
+    } else {
+      const seen = new Set<string>();
+      for (const line of values.recipeItems) {
+        if (line.inventoryItemId == null) {
+          recipe = 'recipe-invalid';
+          break;
+        }
+        const quantity = parseQuantityMilli(line.quantityInput);
+        if (quantity == null || quantity <= 0) {
+          recipe = 'recipe-invalid';
+          break;
+        }
+        if (seen.has(line.inventoryItemId)) {
+          recipe = 'recipe-duplicate';
+          break;
+        }
+        seen.add(line.inventoryItemId);
       }
-      const quantity = parseQuantityMilli(line.quantityInput);
-      if (quantity == null || quantity <= 0) {
-        recipe = 'recipe-invalid';
-        break;
-      }
-      if (seen.has(line.inventoryItemId)) {
-        recipe = 'recipe-duplicate';
-        break;
-      }
-      seen.add(line.inventoryItemId);
     }
   }
 
@@ -226,7 +204,6 @@ export function validateProductForm(values: ProductFormValues): ProductFormValid
 
 /** Build the `createProduct` payload from validated form values. */
 export function buildProductCreateInput(values: ProductFormValues): CreateProductInput {
-  const mode = resolveStockMode(values);
   return {
     name: values.name.trim(),
     categoryId: values.categoryId ?? undefined,
@@ -234,7 +211,7 @@ export function buildProductCreateInput(values: ProductFormValues): CreateProduc
     imageUri: values.imageUri ?? undefined,
     barcode: values.barcode.trim() || undefined,
     priceMinor: parseMoneyInput(values.priceInput) ?? 0,
-    inventoryItemId: mode === 'direct' ? values.inventoryItemId ?? undefined : undefined,
+    inventoryItemId: values.stockMode === 'direct' ? values.inventoryItemId ?? undefined : undefined,
   };
 }
 
@@ -244,7 +221,6 @@ export function buildProductCreateInput(values: ProductFormValues): CreateProduc
  * category, image, description or barcode on edit.
  */
 export function buildProductUpdateInput(values: ProductFormValues): UpdateProductInput {
-  const mode = resolveStockMode(values);
   return {
     name: values.name.trim(),
     categoryId: values.categoryId,
@@ -252,7 +228,7 @@ export function buildProductUpdateInput(values: ProductFormValues): UpdateProduc
     imageUri: values.imageUri,
     barcode: values.barcode.trim() || null,
     priceMinor: parseMoneyInput(values.priceInput) ?? 0,
-    inventoryItemId: mode === 'direct' ? values.inventoryItemId : null,
+    inventoryItemId: values.stockMode === 'direct' ? values.inventoryItemId : null,
   };
 }
 
