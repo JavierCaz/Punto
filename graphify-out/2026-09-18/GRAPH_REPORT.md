@@ -1,7 +1,7 @@
 # Graph Report - punto  (2026-09-18)
 
 ## Corpus Check
-- 267 files · ~203,392 words
+- 267 files · ~203,405 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 6 file(s) not represented in the graph (top: (none) 4, .css 2)
 
@@ -532,7 +532,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.066) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `dependencies` to `package.json`?**
   _High betweenness centrality (0.037) - this node is a cross-community bridge._
-- **Why does `react` connect `products.tsx` to `suppliers.tsx`, `pos.tsx`, `expenses.test.tsx`, `theme.ts`, `useTheme`, `package.json`, `dashboard.test.tsx`, `pos-checkout.test.tsx`, `backup.tsx`, `themed-text.tsx`, `primary-button.tsx`, `formatMoney`, `payment-panel.tsx`, `detail.tsx`, `app/_layout.tsx`, `sales.test.tsx`, `app-tabs.tsx`, `finish.tsx`, `receipt/[id].tsx`, `team/[id].tsx`, `use-catalog.ts`?**
+- **Why does `react-native` connect `theme.ts` to `suppliers.tsx`, `pos.tsx`, `products.tsx`, `src_i18n_index_i18n`, `useTheme`, `package.json`, `backup.tsx`, `themed-text.tsx`, `product-image.ts`, `primary-button.tsx`, `formatMoney`, `dashboard.ts`, `payment-panel.tsx`, `detail.tsx`, `app/_layout.tsx`, `animated-icon.web.tsx`, `finish.tsx`, `receipt/[id].tsx`, `team/[id].tsx`?**
   _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **What connects `AppVariant`, `name`, `slug` to the rest of the system?**
   _635 weakly-connected nodes found - possible documentation gaps or missing edges._

@@ -732,9 +732,9 @@
     "semantic_hash": "ff7433ffe7953076b954cf8da12737a2"
   },
   "src/components/product-form.tsx": {
-    "mtime": 1789745799.76573,
-    "seen": 1789745962.4505556,
-    "ast_hash": "5fd66493ac5ca7eb5d70d39963be37f5",
+    "mtime": 1789747079.281714,
+    "seen": 1789747137.2829533,
+    "ast_hash": "caeea1da5bbc62200c42eb396a6930a8",
     "semantic_hash": ""
   },
   "src/components/product-image-picker.tsx": {

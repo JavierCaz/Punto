@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import type { MaterialIconName } from './empty-state';
 import { FormField } from './form-field';
 import { ListRow } from './list-row';
 import { PrimaryButton } from './primary-button';
@@ -36,6 +37,14 @@ function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T
   delete next[key];
   return next;
 }
+
+/** Distinct icon per payment method type for the "add method" picker. */
+const METHOD_ICONS: Record<PaymentMethod['type'], MaterialIconName> = {
+  CASH: 'cash',
+  CARD: 'credit-card-outline',
+  TRANSFER: 'bank-transfer',
+  OTHER: 'dots-horizontal-circle-outline',
+};
 
 /**
  * Payment selection. Methods are opt-in: the cashier adds the methods they need
@@ -275,7 +284,7 @@ export function PaymentPanel({
                 <ListRow
                   key={method.id}
                   title={method.name}
-                  icon="plus"
+                  icon={METHOD_ICONS[method.type]}
                   onPress={() => addMethod(method.id)}
                   divided={index < availableMethods.length - 1}
                   testID={`payment-option-${method.id}`}
