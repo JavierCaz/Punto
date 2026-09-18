@@ -96,7 +96,10 @@ export default function LoginScreen() {
     try {
       const outcome = await signIn(normalizeUsername(username), secret);
       if (outcome.ok) {
-        router.replace('/');
+        // A brand-new owner (or one who signed out mid-wizard) resumes the
+        // guided setup; everyone else lands in the tabs.
+        const phase = useAuthStore.getState().phase;
+        router.replace(phase === 'setup' ? '/setup/suppliers' : '/');
         return;
       }
       if (outcome.code === 'locked') {

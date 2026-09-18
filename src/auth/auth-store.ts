@@ -9,6 +9,7 @@ import {
   signIn as repoSignIn,
 } from '@/auth/auth-repository';
 import { loginLimiter } from '@/auth/lockout';
+import { getSetupCompleted, setSetupCompleted } from '@/db';
 import { hashSecret } from '@/lib/hash';
 
 /**
@@ -27,16 +28,25 @@ import { hashSecret } from '@/lib/hash';
 
 export const SESSION_STORAGE_KEY = 'punto.session-employee-id';
 
-const AUTH_PHASES: readonly string[] = ['loading', 'onboarding', 'login', 'ready'];
+const AUTH_PHASES: readonly string[] = ['loading', 'onboarding', 'login', 'setup', 'ready'];
 
 export function isAuthPhase(value: unknown): value is AuthPhase {
   return typeof value === 'string' && AUTH_PHASES.includes(value);
 }
 
-/** Pure decision: which phase a business-exists + session-user pair yields. */
-export function resolveAuthPhase(hasBusiness: boolean, user: SessionUser | null): AuthPhase {
+/**
+ * Pure decision: which surface a (business-exists, session-user,
+ * setup-completed) triple yields. A missing setup flag means the guided wizard
+ * is still pending for an authenticated owner.
+ */
+export function resolveAuthPhase(
+  hasBusiness: boolean,
+  user: SessionUser | null,
+  setupCompleted: boolean,
+): AuthPhase {
   if (!hasBusiness) return 'onboarding';
-  return user ? 'ready' : 'login';
+  if (!user) return 'login';
+  return setupCompleted ? 'ready' : 'setup';
 }
 
 export type SignInOutcome =
@@ -49,7 +59,7 @@ export type OnboardingOutcome =
 
 interface AuthStoreState {
   phase: AuthPhase;
-  /** Current session identity; non-null exactly when phase === 'ready'. */
+  /** Current session identity; non-null in the 'setup' and 'ready' phases. */
   user: SessionUser | null;
   hasHydrated: boolean;
   hydrate: () => Promise<void>;
@@ -65,6 +75,7 @@ interface AuthStoreState {
     username: string;
     password: string;
   }) => Promise<OnboardingOutcome>;
+  completeSetup: () => Promise<void>;
   signOut: () => void;
   /**
    * Reset the session after the business row is removed (clear-all data):
@@ -93,8 +104,9 @@ export const useAuthStore = create<AuthStoreState>()((set, get) => ({
           user = await findActiveEmployeeById(storedId);
         }
       }
+      const setupCompleted = hasBusiness ? await getSetupCompleted() : false;
 
-      set({ user, phase: resolveAuthPhase(hasBusiness, user) });
+      set({ user, phase: resolveAuthPhase(hasBusiness, user, setupCompleted) });
     } finally {
       set({ hasHydrated: true });
     }
@@ -109,8 +121,11 @@ export const useAuthStore = create<AuthStoreState>()((set, get) => ({
         retryAfterSec: result.retryAfterSec,
       };
     }
+    const setupCompleted = await getSetupCompleted().catch(() => false);
     await Storage.setItemAsync(SESSION_STORAGE_KEY, result.user.id);
-    set({ user: result.user, phase: 'ready' });
+    // An authenticated owner whose setup is incomplete resumes the wizard
+    // instead of landing in the tabs (e.g. sign-out mid-setup + re-login).
+    set({ user: result.user, phase: setupCompleted ? 'ready' : 'setup' });
     return { ok: true, user: result.user };
   },
 
@@ -127,12 +142,14 @@ export const useAuthStore = create<AuthStoreState>()((set, get) => ({
         username: input.username,
         passwordHash,
       });
+      // Persist the session pointer before the read so an app kill in this
+      // window still resumes the wizard instead of dropping to login.
+      await Storage.setItemAsync(SESSION_STORAGE_KEY, employeeId);
       const user = await findActiveEmployeeById(employeeId);
       if (!user) {
         return { ok: false, code: 'failed' };
       }
-      await Storage.setItemAsync(SESSION_STORAGE_KEY, user.id);
-      set({ user, phase: 'ready' });
+      set({ user, phase: 'setup' });
       return { ok: true, user };
     } catch (error) {
       if (error instanceof Error && error.message === 'AUTH_USERNAME_TAKEN') {
@@ -140,6 +157,11 @@ export const useAuthStore = create<AuthStoreState>()((set, get) => ({
       }
       return { ok: false, code: 'failed' };
     }
+  },
+
+  completeSetup: async () => {
+    await setSetupCompleted(true);
+    set({ phase: 'ready' });
   },
 
   signOut: () => {

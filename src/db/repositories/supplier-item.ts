@@ -161,7 +161,7 @@ export async function upsertSupplierItem(
   return withTransaction((txn) => upsertSupplierItemWithTxn(txn, input));
 }
 
-async function upsertSupplierItemWithTxn(
+export async function upsertSupplierItemWithTxn(
   txn: DatabaseAdapter,
   input: UpsertSupplierItemInput,
 ): Promise<SupplierItem> {

@@ -6,8 +6,24 @@
  * so no `getDb()` mock is needed).
  */
 
-import { getMetadata, nextPurchaseNumber, nextSaleNumber, setMetadata } from '@/db/repositories/app-metadata';
+import {
+  getMetadata,
+  getSetupCompleted,
+  nextPurchaseNumber,
+  nextSaleNumber,
+  setMetadata,
+  setSetupCompleted,
+} from '@/db/repositories/app-metadata';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
+
+const mockDb = { getFirstAsync: jest.fn() };
+jest.mock('@/db/client', () => ({ getDb: jest.fn(async () => mockDb) }));
+
+const mockWithTransaction = jest.fn();
+jest.mock('@/db/repositories/transaction', () => ({
+  withTransaction: (...args: unknown[]) => mockWithTransaction(...args),
+}));
+
 
 describe('app-metadata', () => {
   let adapter: RecordingAdapter;
@@ -56,5 +72,35 @@ describe('app-metadata', () => {
     adapter.queueFirst('FROM app_metadata', { value: 'not-a-number' });
 
     expect(await nextSaleNumber(adapter)).toBe('S-000001');
+  });
+});
+
+describe('setup completion flag', () => {
+  beforeEach(() => {
+    mockDb.getFirstAsync.mockReset();
+    mockWithTransaction.mockReset();
+  });
+
+  it('reports completed only for the stored "1" value', async () => {
+    mockDb.getFirstAsync.mockResolvedValue({ value: '1' });
+    expect(await getSetupCompleted()).toBe(true);
+
+    mockDb.getFirstAsync.mockResolvedValue(null);
+    expect(await getSetupCompleted()).toBe(false);
+
+    mockDb.getFirstAsync.mockResolvedValue({ value: '0' });
+    expect(await getSetupCompleted()).toBe(false);
+  });
+
+  it('writes the flag through a transaction', async () => {
+    const adapter = new RecordingAdapter();
+    mockWithTransaction.mockImplementation(async (fn: (txn: RecordingAdapter) => Promise<void>) =>
+      fn(adapter),
+    );
+
+    await setSetupCompleted(true);
+
+    const upsert = adapter.calls.find((call) => call.sql.includes('INSERT INTO app_metadata'));
+    expect(upsert!.params).toEqual(['setup_completed', '1']);
   });
 });

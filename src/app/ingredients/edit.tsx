@@ -10,19 +10,11 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import {
   REPO_ERROR,
-  adjustQuantity,
   archiveInventoryItem,
-  createInventoryItem,
-  deleteSupplierItem,
   getInventoryItemById,
   isRepoError,
-  listSupplierItems,
   listSuppliers,
   listUnits,
-  MANUAL_ADJUSTMENT_REASON,
-  recordMovement,
-  updateInventoryItem,
-  upsertSupplierItem,
   type InventoryItem,
   type Supplier,
   type Unit,
@@ -30,35 +22,8 @@ import {
 import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import { parseQuantityMilli } from '@/lib/catalog-form';
+import { resolveSupplierForItem, saveIngredient } from '@/lib/catalog-save';
 
-/** Find which supplier (if any) is currently linked to an inventory item. */
-async function resolveSupplierForItem(
-  suppliers: Supplier[],
-  inventoryItemId: string | null,
-): Promise<string | null> {
-  if (!inventoryItemId) {
-    return null;
-  }
-  for (const supplier of suppliers) {
-    const links = await listSupplierItems(supplier.id);
-    if (links.some((link) => link.inventoryItemId === inventoryItemId)) {
-      return supplier.id;
-    }
-  }
-  return null;
-}
-
-/** Remove the link between a supplier and an inventory item, when present. */
-async function removeSupplierLink(
-  supplierId: string,
-  inventoryItemId: string,
-): Promise<void> {
-  const links = await listSupplierItems(supplierId);
-  const link = links.find((entry) => entry.inventoryItemId === inventoryItemId);
-  if (link) {
-    await deleteSupplierItem(link.id);
-  }
-}
 
 export default function InventoryItemEditScreen() {
   const { t } = useTranslation();
@@ -125,61 +90,18 @@ export default function InventoryItemEditScreen() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const initialQuantity = parseQuantityMilli(values.initialQuantityInput) ?? 0;
-      const adjustedQuantity = parseQuantityMilli(values.adjustQuantityInput) ?? 0;
-
-      if (item) {
-        await updateInventoryItem(item.id, {
+      await saveIngredient(
+        {
           name: values.name,
           unitId: values.unitId,
           minimumQuantity: values.minimumQuantity,
           unitCostMinor: values.unitCostMinor,
-        });
-
-        // The stock cache is ledger-owned: a manual count posts an ADJUSTMENT.
-        if (adjustedQuantity !== item.currentQuantity) {
-          await adjustQuantity({
-            inventoryItemId: item.id,
-            newQuantity: adjustedQuantity,
-            reason: MANUAL_ADJUSTMENT_REASON,
-          });
-        }
-
-        // Only touch the link when the supplier actually changed — re-upserting
-        // an unchanged link would reset its SKU/last-price to null/0.
-        if (values.supplierId && values.supplierId !== initialSupplierId) {
-          await upsertSupplierItem({
-            supplierId: values.supplierId,
-            inventoryItemId: item.id,
-          });
-        }
-        if (initialSupplierId && initialSupplierId !== values.supplierId) {
-          await removeSupplierLink(initialSupplierId, item.id);
-        }
-      } else {
-        const created = await createInventoryItem({
-          name: values.name,
-          unitId: values.unitId,
-          minimumQuantity: values.minimumQuantity,
-          unitCostMinor: values.unitCostMinor,
-        });
-
-        if (initialQuantity > 0) {
-          await recordMovement({
-            inventoryItemId: created.id,
-            type: 'INITIAL_STOCK',
-            quantity: initialQuantity,
-          });
-        }
-
-        if (values.supplierId) {
-          await upsertSupplierItem({
-            supplierId: values.supplierId,
-            inventoryItemId: created.id,
-          });
-        }
-      }
-
+          initialQuantity: parseQuantityMilli(values.initialQuantityInput) ?? 0,
+          adjustedQuantity: parseQuantityMilli(values.adjustQuantityInput) ?? 0,
+          supplierId: values.supplierId,
+        },
+        item ? { item, initialSupplierId } : null,
+      );
       router.back();
     } catch (error) {
       setSubmitError(

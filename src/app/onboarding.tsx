@@ -1,6 +1,10 @@
 /**
- * First-run wizard (Stack.Protected guard, phase === 'onboarding'): creates
- * the business + ADMIN owner in one form, then jumps into the POS tabs.
+ * First-run wizard, steps 1–2 (Stack.Protected guard, phase === 'onboarding'):
+ * creates the business + ADMIN owner, then hands off to the `setup` route group
+ * for the remaining data steps.
+ *
+ * One screen at a time, sharing the same progress bar / footer chrome as the
+ * setup steps via `WizardStep` (see @/constants/wizard for the full step list).
  */
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { getLocales } from 'expo-localization';
@@ -13,11 +17,9 @@ import { normalizeUsername, useAuthStore, validatePassword, validateUsername } f
 import { BusinessLogoPicker, type BusinessLogoError } from '@/components/business-logo-picker';
 import { CurrencySwitch } from '@/components/currency-switch';
 import { LanguageSwitch } from '@/components/language-switch';
-import { PrimaryButton } from '@/components/primary-button';
-import { Screen } from '@/components/screen';
-import { SectionHeader } from '@/components/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WizardStep } from '@/components/wizard-step';
 import { resolveDefaultCurrency, type CurrencyCode } from '@/constants/currencies';
 import { Radius, Spacing, TouchTarget, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,6 +28,8 @@ import { deleteBusinessLogo } from '@/lib/business-logo';
 
 /** Device currency seeds the initial selection when it is one of ours. */
 const INITIAL_CURRENCY = resolveDefaultCurrency(getLocales()[0]?.currencyCode);
+
+type OnboardingStep = 'business' | 'account';
 
 type ErrorField =
   | 'businessName'
@@ -53,6 +57,7 @@ export default function OnboardingScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
 
+  const [step, setStep] = useState<OnboardingStep>('business');
   const [businessName, setBusinessName] = useState('');
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<BusinessLogoError | null>(null);
@@ -88,15 +93,20 @@ export default function OnboardingScreen() {
     },
   ];
 
+  function handleBusinessContinue(): void {
+    if (businessName.trim().length === 0) {
+      setError({ field: 'businessName', messageKey: 'onboarding.errors.businessNameRequired' });
+      return;
+    }
+    setError(null);
+    setStep('account');
+  }
+
   async function handleSubmit(): Promise<void> {
     if (submitting) {
       return;
     }
 
-    if (businessName.trim().length === 0) {
-      setError({ field: 'businessName', messageKey: 'onboarding.errors.businessNameRequired' });
-      return;
-    }
     if (firstName.trim().length === 0) {
       setError({ field: 'firstName', messageKey: 'onboarding.errors.firstNameRequired' });
       return;
@@ -137,22 +147,26 @@ export default function OnboardingScreen() {
       return;
     }
 
-    void router.replace('/');
+    // The store flipped the guard to the setup phase; jump into step 3.
+    void router.replace('/setup/suppliers');
   }
 
-  return (
-    <Screen scroll contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <ThemedText type="display">
-          {t('common.appName')}
-          <ThemedText type="display" themeColor="primary">
-            .
+  if (step === 'business') {
+    return (
+      <WizardStep
+        stepId="business"
+        title={t('onboarding.stepBusiness')}
+        onContinue={handleBusinessContinue}
+        testID="onboarding-business">
+        <View style={styles.hero}>
+          <ThemedText type="display">
+            {t('common.appName')}
+            <ThemedText type="display" themeColor="primary">
+              .
+            </ThemedText>
           </ThemedText>
-        </ThemedText>
-      </View>
+        </View>
 
-      <View style={styles.section}>
-        <SectionHeader level="section" title={t('onboarding.stepBusiness')} />
         <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
           <View style={styles.cardBody}>
             <View style={styles.fieldGroup}>
@@ -217,138 +231,129 @@ export default function OnboardingScreen() {
             </View>
           </View>
         </ThemedView>
-      </View>
+      </WizardStep>
+    );
+  }
 
-      <View style={styles.section}>
-        <SectionHeader level="section" title={t('onboarding.stepAccount')} />
-        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <View style={styles.cardBody}>
-            <ThemedText type="body2" themeColor="textSecondary">
-              {t('onboarding.accountHint')}
-            </ThemedText>
-
-            <View
-              style={[
-                styles.roleBadge,
-                { backgroundColor: theme.backgroundSelected, borderColor: theme.backgroundSelected },
-              ]}>
-              <MaterialCommunityIcons name="shield-account-outline" size={14} color={theme.text} />
-              <ThemedText type="micro">{t('roles.admin')}</ThemedText>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <ThemedText type="body2">{t('onboarding.firstNameLabel')}</ThemedText>
-              <TextInput
-                value={firstName}
-                onChangeText={(text) => {
-                  setFirstName(text);
-                  clearErrorsFor(['firstName']);
-                }}
-                placeholder={t('onboarding.firstNamePlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-                style={inputStyle('firstName')}
-                textContentType="givenName"
-                accessibilityLabel={t('onboarding.firstNameLabel')}
-              />
-              {renderFieldError('firstName')}
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <ThemedText type="body2">{t('onboarding.usernameLabel')}</ThemedText>
-              <TextInput
-                value={username}
-                onChangeText={(text) => {
-                  setUsername(text);
-                  clearErrorsFor(['username']);
-                }}
-                placeholder={t('onboarding.usernamePlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-                style={inputStyle('username')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="username"
-                accessibilityLabel={t('onboarding.usernameLabel')}
-              />
-              {renderFieldError('username')}
-              <ThemedText type="body2" themeColor="textSecondary">
-                {t('onboarding.usernameHint')}
-              </ThemedText>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <ThemedText type="body2">{t('onboarding.passwordLabel')}</ThemedText>
-              <TextInput
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  clearErrorsFor(['password', 'confirm']);
-                }}
-                placeholder={t('onboarding.passwordPlaceholder')}
-                placeholderTextColor={theme.textSecondary}
-                style={inputStyle('password')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="newPassword"
-                accessibilityLabel={t('onboarding.passwordLabel')}
-              />
-              {renderFieldError('password')}
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <ThemedText type="body2">{t('onboarding.confirmPasswordLabel')}</ThemedText>
-              <TextInput
-                value={confirmPassword}
-                onChangeText={(text) => {
-                  setConfirmPassword(text);
-                  clearErrorsFor(['confirm']);
-                }}
-                style={inputStyle('confirm')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="newPassword"
-                returnKeyType="done"
-                onSubmitEditing={() => {
-                  void handleSubmit();
-                }}
-                accessibilityLabel={t('onboarding.confirmPasswordLabel')}
-              />
-              {renderFieldError('confirm')}
-            </View>
+  return (
+    <WizardStep
+      stepId="account"
+      title={t('onboarding.stepAccount')}
+      subtitle={t('onboarding.accountHint')}
+      onBack={() => setStep('business')}
+      onContinue={() => {
+        void handleSubmit();
+      }}
+      continueLabel={submitting ? t('onboarding.submitPending') : t('onboarding.submit')}
+      busy={submitting}
+      testID="onboarding-account">
+      <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+        <View style={styles.cardBody}>
+          <View
+            style={[
+              styles.roleBadge,
+              { backgroundColor: theme.backgroundSelected, borderColor: theme.backgroundSelected },
+            ]}>
+            <MaterialCommunityIcons name="shield-account-outline" size={14} color={theme.text} />
+            <ThemedText type="micro">{t('roles.admin')}</ThemedText>
           </View>
-        </ThemedView>
-      </View>
 
-      <View style={styles.footer}>
-        {error?.field === 'form' ? (
-          <ThemedText type="body2" themeColor="danger" style={styles.formErrorText}>
-            {t(error.messageKey)}
-          </ThemedText>
-        ) : null}
-        <PrimaryButton
-          label={submitting ? t('onboarding.submitPending') : t('onboarding.submit')}
-          onPress={() => {
-            void handleSubmit();
-          }}
-          icon="check"
-          disabled={submitting}
-        />
-      </View>
-    </Screen>
+          <View style={styles.fieldGroup}>
+            <ThemedText type="body2">{t('onboarding.firstNameLabel')}</ThemedText>
+            <TextInput
+              value={firstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                clearErrorsFor(['firstName']);
+              }}
+              placeholder={t('onboarding.firstNamePlaceholder')}
+              placeholderTextColor={theme.textSecondary}
+              style={inputStyle('firstName')}
+              textContentType="givenName"
+              accessibilityLabel={t('onboarding.firstNameLabel')}
+            />
+            {renderFieldError('firstName')}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <ThemedText type="body2">{t('onboarding.usernameLabel')}</ThemedText>
+            <TextInput
+              value={username}
+              onChangeText={(text) => {
+                setUsername(text);
+                clearErrorsFor(['username']);
+              }}
+              placeholder={t('onboarding.usernamePlaceholder')}
+              placeholderTextColor={theme.textSecondary}
+              style={inputStyle('username')}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="username"
+              accessibilityLabel={t('onboarding.usernameLabel')}
+            />
+            {renderFieldError('username')}
+            <ThemedText type="body2" themeColor="textSecondary">
+              {t('onboarding.usernameHint')}
+            </ThemedText>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <ThemedText type="body2">{t('onboarding.passwordLabel')}</ThemedText>
+            <TextInput
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                clearErrorsFor(['password', 'confirm']);
+              }}
+              placeholder={t('onboarding.passwordPlaceholder')}
+              placeholderTextColor={theme.textSecondary}
+              style={inputStyle('password')}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="newPassword"
+              accessibilityLabel={t('onboarding.passwordLabel')}
+            />
+            {renderFieldError('password')}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <ThemedText type="body2">{t('onboarding.confirmPasswordLabel')}</ThemedText>
+            <TextInput
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                clearErrorsFor(['confirm']);
+              }}
+              style={inputStyle('confirm')}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="newPassword"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                void handleSubmit();
+              }}
+              accessibilityLabel={t('onboarding.confirmPasswordLabel')}
+            />
+            {renderFieldError('confirm')}
+          </View>
+        </View>
+      </ThemedView>
+
+      {error?.field === 'form' ? (
+        <ThemedText type="body2" themeColor="danger" style={styles.formErrorText}>
+          {t(error.messageKey)}
+        </ThemedText>
+      ) : null}
+    </WizardStep>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: Spacing.four,
-  },
   hero: {
     alignItems: 'center',
     paddingTop: Spacing.one,
-  },
-  section: {
-    gap: Spacing.two,
   },
   card: {
     borderRadius: Radius.lg,
@@ -388,8 +393,5 @@ const styles = StyleSheet.create({
   },
   formErrorText: {
     textAlign: 'center',
-  },
-  footer: {
-    gap: Spacing.two,
   },
 });

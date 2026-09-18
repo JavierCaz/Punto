@@ -11,18 +11,12 @@ import { Spacing } from '@/constants/theme';
 import {
   REPO_ERROR,
   archiveProduct,
-  createProduct,
   getProductById,
   getRecipeByProductId,
   isRepoError,
   listCategories,
   listInventoryItems,
-  listSupplierItems,
   listSuppliers,
-  setRecipeActive,
-  updateProduct,
-  upsertRecipe,
-  upsertSupplierItem,
   type Category,
   type InventoryItem,
   type Product,
@@ -32,31 +26,13 @@ import {
 import { showConfirm, showMessage } from '@/dialog';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  buildProductCreateInput,
-  buildProductUpdateInput,
-  buildRecipeItems,
   formatQuantityMilli,
-  resolveStockMode,
   type ProductFormValues,
   type RecipeLineValue,
 } from '@/lib/catalog-form';
+import { resolveSupplierForItem, saveProduct } from '@/lib/catalog-save';
 import { deleteProductImage } from '@/lib/product-image';
 
-async function resolveSupplierForItem(
-  suppliers: Supplier[],
-  inventoryItemId: string | null,
-): Promise<string | null> {
-  if (!inventoryItemId) {
-    return null;
-  }
-  for (const supplier of suppliers) {
-    const links = await listSupplierItems(supplier.id);
-    if (links.some((link) => link.inventoryItemId === inventoryItemId)) {
-      return supplier.id;
-    }
-  }
-  return null;
-}
 
 export default function ProductEditScreen() {
   const { t } = useTranslation();
@@ -143,51 +119,7 @@ export default function ProductEditScreen() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const mode = resolveStockMode(values);
-
-      if (product) {
-        const wantsDirect = mode === 'direct';
-
-        // Deactivate any existing recipe BEFORE clearing the bridge, so a
-        // recipe→direct switch satisfies the XOR invariant in updateProduct.
-        if (recipe && mode !== 'recipe') {
-          await setRecipeActive(recipe.id, false);
-        }
-
-        await updateProduct(product.id, buildProductUpdateInput(values));
-
-        if (mode === 'recipe') {
-          await upsertRecipe({
-            productId: product.id,
-            isActive: true,
-            items: buildRecipeItems(values.recipeItems),
-          });
-        }
-
-        if (wantsDirect && values.inventoryItemId && values.supplierId) {
-          await upsertSupplierItem({
-            supplierId: values.supplierId,
-            inventoryItemId: values.inventoryItemId,
-          });
-        }
-
-        if (product.imageUri && product.imageUri !== values.imageUri) {
-          deleteProductImage(product.imageUri);
-        }
-      } else {
-        const created = await createProduct(buildProductCreateInput(values));
-
-        if (mode === 'recipe') {
-          await upsertRecipe({ productId: created.id, items: buildRecipeItems(values.recipeItems) });
-        }
-        if (mode === 'direct' && created.inventoryItemId && values.supplierId) {
-          await upsertSupplierItem({
-            supplierId: values.supplierId,
-            inventoryItemId: created.inventoryItemId,
-          });
-        }
-      }
-
+      await saveProduct(values, product ? { product, recipe, initialSupplierId } : null);
       router.back();
     } catch (error) {
       setSubmitError(

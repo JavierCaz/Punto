@@ -263,7 +263,7 @@ export async function upsertRecipe(input: UpsertRecipeInput): Promise<RecipeDeta
   return withTransaction((txn) => upsertRecipeWithTxn(txn, businessId, input));
 }
 
-async function upsertRecipeWithTxn(
+export async function upsertRecipeWithTxn(
   txn: DatabaseAdapter,
   businessId: string,
   input: UpsertRecipeInput,

@@ -207,7 +207,7 @@ export async function createInventoryItem(
   return withTransaction((txn) => createInventoryItemWithTxn(txn, businessId, input));
 }
 
-async function createInventoryItemWithTxn(
+export async function createInventoryItemWithTxn(
   txn: DatabaseAdapter,
   businessId: string,
   input: CreateInventoryItemInput,

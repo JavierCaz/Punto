@@ -1,4 +1,6 @@
+import { getDb } from '@/db/client';
 import type { DatabaseAdapter } from '@/db/repositories/database';
+import { withTransaction } from '@/db/repositories/transaction';
 
 /**
  * App metadata + monotonic document counters (`app_metadata` table).
@@ -71,4 +73,32 @@ export function nextSaleNumber(txn: DatabaseAdapter): Promise<string> {
 /** Next purchase number, e.g. `P-000001`. Call inside the purchase txn. */
 export function nextPurchaseNumber(txn: DatabaseAdapter): Promise<string> {
   return nextDocumentNumber(txn, PURCHASE_SEQUENCE_KEY, 'P');
+}
+
+/**
+ * Guided-setup completion flag. Absence means "not completed yet", so a
+ * freshly-created business needs no explicit `'0'` write; only finishing the
+ * wizard (or skipping every step) writes `'1'`.
+ *
+ * Living in `app_metadata` means the flag rides JSON backup/import and is
+ * wiped by `clearAllData`, keeping the resume state consistent with the
+ * business data it describes.
+ */
+const SETUP_COMPLETED_KEY = 'setup_completed';
+
+/** Whether the guided setup wizard has been completed (or skipped) already. */
+export async function getSetupCompleted(): Promise<boolean> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM app_metadata WHERE key = ?',
+    SETUP_COMPLETED_KEY,
+  );
+  return row?.value === '1';
+}
+
+/** Persist the guided-setup completion flag. */
+export async function setSetupCompleted(completed: boolean): Promise<void> {
+  await withTransaction(async (txn) => {
+    await setMetadata(txn, SETUP_COMPLETED_KEY, completed ? '1' : '0');
+  });
 }

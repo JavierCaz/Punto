@@ -195,6 +195,16 @@ export type {
   UpdateProductInput,
 } from '@/db/repositories/product';
 
+// Atomic catalog creates (entry + stock/recipe/supplier link in one txn).
+export {
+  createInventoryItemWithStock,
+  createProductWithStock,
+} from '@/db/repositories/catalog-setup';
+export type {
+  CreateInventoryItemWithStockOptions,
+  CreateProductWithStockOptions,
+} from '@/db/repositories/catalog-setup';
+
 // Recipes (product-bound ingredient consumption).
 export {
   getRecipeByProductId,
@@ -293,7 +303,7 @@ export type {
 } from '@/db/repositories/finance';
 
 // App metadata + document counters.
-export { getMetadata, nextPurchaseNumber, nextSaleNumber, setMetadata } from '@/db/repositories/app-metadata';
+export { getMetadata, getSetupCompleted, nextPurchaseNumber, nextSaleNumber, setMetadata, setSetupCompleted } from '@/db/repositories/app-metadata';
 
 // Analytics (Dashboard aggregates).
 export {

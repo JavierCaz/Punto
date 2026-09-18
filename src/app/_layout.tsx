@@ -139,6 +139,10 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding" />
             </Stack.Protected>
 
+            <Stack.Protected guard={authPhase === 'setup'}>
+              <Stack.Screen name="setup" />
+            </Stack.Protected>
+
             <Stack.Protected guard={authPhase === 'login'}>
               <Stack.Screen name="login" />
             </Stack.Protected>

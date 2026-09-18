@@ -35,4 +35,4 @@ export interface AuthEmployee {
 export type SessionUser = AuthEmployee;
 
 /** Boot/gating state: which surface the router should show. */
-export type AuthPhase = 'loading' | 'onboarding' | 'login' | 'ready';
+export type AuthPhase = 'loading' | 'onboarding' | 'login' | 'setup' | 'ready';

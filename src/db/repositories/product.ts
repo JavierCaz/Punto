@@ -218,7 +218,7 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
   return withTransaction((txn) => createProductWithTxn(txn, businessId, input));
 }
 
-async function createProductWithTxn(
+export async function createProductWithTxn(
   txn: DatabaseAdapter,
   businessId: string,
   input: CreateProductInput,

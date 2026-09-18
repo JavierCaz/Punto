@@ -37,6 +37,12 @@ jest.mock('@/auth/auth-repository', () => ({
   signIn: (...args: unknown[]) => mockRepo.signIn(...args),
 }));
 
+const mockSetup = { getSetupCompleted: jest.fn(), setSetupCompleted: jest.fn() };
+jest.mock('@/db', () => ({
+  getSetupCompleted: (...args: unknown[]) => mockSetup.getSetupCompleted(...args),
+  setSetupCompleted: (...args: unknown[]) => mockSetup.setSetupCompleted(...args),
+}));
+
 const mockHash = { hashSecret: jest.fn() };
 jest.mock('@/lib/hash', () => ({
   hashSecret: (...args: unknown[]) => mockHash.hashSecret(...args),
@@ -67,20 +73,26 @@ const employee: SessionUser = {
 beforeEach(() => {
   mockMemory.clear();
   jest.clearAllMocks();
+  mockSetup.getSetupCompleted.mockResolvedValue(true);
+  mockSetup.setSetupCompleted.mockResolvedValue(undefined);
   useAuthStore.setState({ phase: 'loading', user: null, hasHydrated: false });
 });
 
 describe('resolveAuthPhase', () => {
   it('no business -> onboarding regardless of a stale user', () => {
-    expect(resolveAuthPhase(false, admin)).toBe('onboarding');
+    expect(resolveAuthPhase(false, admin, false)).toBe('onboarding');
   });
 
   it('business without a user -> login', () => {
-    expect(resolveAuthPhase(true, null)).toBe('login');
+    expect(resolveAuthPhase(true, null, false)).toBe('login');
   });
 
-  it('business with a user -> ready', () => {
-    expect(resolveAuthPhase(true, admin)).toBe('ready');
+  it('business with a user and setup done -> ready', () => {
+    expect(resolveAuthPhase(true, admin, true)).toBe('ready');
+  });
+
+  it('business with a user and setup pending -> setup', () => {
+    expect(resolveAuthPhase(true, admin, false)).toBe('setup');
   });
 });
 
@@ -114,6 +126,17 @@ describe('auth store hydrate', () => {
     expect(useAuthStore.getState().user?.id).toBe(admin.id);
   });
 
+  it('resumes setup for an authenticated owner who has not finished it', async () => {
+    mockRepo.businessExists.mockResolvedValue(true);
+    mockMemory.set(SESSION_STORAGE_KEY, admin.id);
+    mockRepo.findActiveEmployeeById.mockResolvedValue(admin);
+    mockSetup.getSetupCompleted.mockResolvedValue(false);
+
+    await useAuthStore.getState().hydrate();
+
+    expect(useAuthStore.getState().phase).toBe('setup');
+  });
+
   it('ignores a stale session id (archived/inactive user)', async () => {
     mockRepo.businessExists.mockResolvedValue(true);
     mockMemory.set(SESSION_STORAGE_KEY, 'emp-gone');
@@ -145,6 +168,15 @@ describe('auth store sign-in', () => {
     expect(useAuthStore.getState().phase).toBe('ready');
     expect(useAuthStore.getState().user?.id).toBe(employee.id);
     expect(mockMemory.get(SESSION_STORAGE_KEY)).toBe(employee.id);
+  });
+
+  it('resumes the setup wizard when the flag is absent', async () => {
+    mockSetup.getSetupCompleted.mockResolvedValue(false);
+    mockRepo.signIn.mockResolvedValue({ ok: true, user: admin });
+
+    await useAuthStore.getState().signIn('ana.duena', 'sup3r-secret');
+
+    expect(useAuthStore.getState().phase).toBe('setup');
   });
 
   it('surfaces invalid credentials without changing the phase', async () => {
@@ -209,7 +241,18 @@ describe('auth store onboarding', () => {
       username: 'ana.duena',
       passwordHash: 'pbkdf2-sha256$150000$salt$dk',
     });
-    expect(useAuthStore.getState().phase).toBe('ready');
+    expect(useAuthStore.getState().phase).toBe('setup');
     expect(mockMemory.get(SESSION_STORAGE_KEY)).toBe(admin.id);
+  });
+});
+
+describe('auth store setup', () => {
+  it('marks setup complete and enters the ready phase', async () => {
+    useAuthStore.setState({ phase: 'setup', user: admin });
+
+    await useAuthStore.getState().completeSetup();
+
+    expect(mockSetup.setSetupCompleted).toHaveBeenCalledWith(true);
+    expect(useAuthStore.getState().phase).toBe('ready');
   });
 });
