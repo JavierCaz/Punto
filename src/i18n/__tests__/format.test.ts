@@ -33,6 +33,13 @@ describe('formatMoney', () => {
     // Unchanged when the option is off.
     expect(formatMoney(123000, 'MXN', { locale: 'es-MX' })).toBe('$1,230.00');
   });
+
+  it('uses comma thousands and dot decimals by default in Spanish', () => {
+    // No explicit locale: the active language is 'es'. Spanish must format
+    // Latin-American style ($1,000.00), never Spain's `1.000,00` grouping.
+    expect(formatMoney(100000, 'MXN')).toBe('$1,000.00');
+    expect(formatMoney(123456, 'MXN')).toBe('$1,234.56');
+  });
 });
 
 describe('formatQuantity', () => {
@@ -50,6 +57,10 @@ describe('formatQuantity', () => {
 
   it('supports es thousands separators', () => {
     expect(formatQuantity(1500000, { maxDecimals: 0, locale: 'es-MX' })).toBe('1,500');
+  });
+
+  it('uses comma thousands by default in Spanish', () => {
+    expect(formatQuantity(1500000, { maxDecimals: 0 })).toBe('1,500');
   });
 });
 

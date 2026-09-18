@@ -24,8 +24,29 @@ export function setFormatLocale(language: SupportedLanguage): void {
   activeLocale = language;
 }
 
+/**
+ * Language-level locale for date/time formatting (dayjs only ships `es`/`en`).
+ */
 function resolveLocale(locale?: string): string {
   return locale ?? activeLocale;
+}
+
+/**
+ * Number/currency formatting locale per UI language.
+ *
+ * The UI language alone carries no region, and the plain `es` CLDR locale
+ * formats like Spain (`1.000,00`). Punto targets Latin America, where amounts
+ * read `1,000.00` (comma thousands, dot decimals), so the Spanish variant is
+ * pinned to `es-MX` and English to `en-US`. Dates keep the plain language
+ * (`resolveLocale`) because dayjs only ships `es`/`en`.
+ */
+const NUMBER_LOCALE: Record<SupportedLanguage, string> = {
+  es: 'es-MX',
+  en: 'en-US',
+};
+
+function resolveNumberLocale(locale?: string): string {
+  return locale ?? NUMBER_LOCALE[activeLocale];
 }
 
 function buildNumberFormat(
@@ -51,7 +72,7 @@ export function formatMoney(
   opts: { minorUnits?: number; locale?: string; trimZeroFraction?: boolean } = {},
 ): string {
   const minorUnits = opts.minorUnits ?? 2;
-  const locale = resolveLocale(opts.locale);
+  const locale = resolveNumberLocale(opts.locale);
 
   // Split minor into major + fraction with integer math so the value handed
   // to Intl has exact significant digits (no float drift from division).
@@ -81,7 +102,7 @@ export function formatQuantity(
   opts: { maxDecimals?: number; locale?: string } = {},
 ): string {
   const maxDecimals = opts.maxDecimals ?? 3;
-  const locale = resolveLocale(opts.locale);
+  const locale = resolveNumberLocale(opts.locale);
   const formatter = buildNumberFormat(locale, {
     maximumFractionDigits: maxDecimals,
   });

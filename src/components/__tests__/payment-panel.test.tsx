@@ -95,7 +95,7 @@ describe('PaymentPanel', () => {
     await fireEvent.changeText(getByTestId('payment-amount-pm-cash'), '10.00');
 
     expect(getByText('Cambio')).toBeTruthy();
-    expect(getByTestId('payment-change-pm-cash')).toHaveTextContent(/5,00/);
+    expect(getByTestId('payment-change-pm-cash')).toHaveTextContent(/5\.00/);
 
     await fireEvent.press(getByText('Confirmar cobro'));
     expect(onSubmit).toHaveBeenCalledWith([
@@ -128,7 +128,7 @@ describe('PaymentPanel', () => {
     await fireEvent.press(getByText('Efectivo'));
     await fireEvent.changeText(getByTestId('payment-amount-pm-cash'), '5.00');
 
-    expect(getByTestId('payment-change-pm-cash')).toHaveTextContent(/3,40/);
+    expect(getByTestId('payment-change-pm-cash')).toHaveTextContent(/3\.40/);
 
     await fireEvent.press(getByText('Confirmar cobro'));
     expect(onSubmit).toHaveBeenCalledWith([
