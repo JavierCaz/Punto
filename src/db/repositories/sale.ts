@@ -1,3 +1,4 @@
+import { ForbiddenError, requireCapability, type AuthActor } from '@/auth/permissions';
 import { getDb } from '@/db/client';
 
 import { nextSaleNumber } from '@/db/repositories/app-metadata';
@@ -980,18 +981,51 @@ async function expireStaleHeldSalesWithTxn(
  * scope until a later phase.
  */
 export async function refundSale(
+  actor: AuthActor,
+  saleId: string,
+  input?: { reason?: string; employeeId?: string; authorizedById?: string; restoreInventory?: boolean },
+): Promise<void> {
+  requireCapability(actor, 'sales.refund');
+  const businessId = await getBusinessId();
+  await withTransaction((txn) => refundSaleWithTxn(txn, businessId, saleId, input ?? {}));
+}
+
+/**
+ * Refund a COMPLETED sale on behalf of an employee, authorized by a manager.
+ *
+ * The authorizer is re-validated IN-DB (never trust a client-supplied id): an
+ * active, non-archived ADMIN must exist with that id, otherwise this throws
+ * `ForbiddenError('sales.refund')`. The refund reuses {@link refundSaleWithTxn}
+ * and stamps `refund_authorized_by` for audit, while the RETURN movements are
+ * attributed to the performing employee via `input.employeeId`.
+ */
+export async function refundSaleAuthorized(
+  authorizingAdminId: string,
   saleId: string,
   input?: { reason?: string; employeeId?: string; restoreInventory?: boolean },
 ): Promise<void> {
   const businessId = await getBusinessId();
-  await withTransaction((txn) => refundSaleWithTxn(txn, businessId, saleId, input ?? {}));
+  await withTransaction(async (txn) => {
+    const admin = await txn.getFirstAsync<{ id: string }>(
+      `SELECT id FROM employee
+        WHERE id = ? AND role = 'ADMIN' AND archived_at IS NULL AND is_active = 1 LIMIT 1`,
+      authorizingAdminId,
+    );
+    if (!admin) {
+      throw new ForbiddenError('sales.refund');
+    }
+    await refundSaleWithTxn(txn, businessId, saleId, {
+      ...(input ?? {}),
+      authorizedById: authorizingAdminId,
+    });
+  });
 }
 
 async function refundSaleWithTxn(
   txn: DatabaseAdapter,
   businessId: string,
   saleId: string,
-  input: { reason?: string; employeeId?: string; restoreInventory?: boolean },
+  input: { reason?: string; employeeId?: string; authorizedById?: string; restoreInventory?: boolean },
 ): Promise<void> {
   const saleRow = await txn.getFirstAsync<Record<string, unknown>>(
     `SELECT ${SALE_COLUMNS} FROM sale WHERE id = ? AND business_id = ? LIMIT 1`,
@@ -1042,11 +1076,13 @@ async function refundSaleWithTxn(
   try {
     await txn.runAsync(
       `UPDATE sale
-          SET status = 'REFUNDED', refunded_at = ?, updated_at = ?, inventory_restored = ?
+          SET status = 'REFUNDED', refunded_at = ?, updated_at = ?, inventory_restored = ?,
+              refund_authorized_by = ?
         WHERE id = ? AND business_id = ?`,
       timestamp,
       timestamp,
       intBool(restoreInventory),
+      input.authorizedById ?? null,
       saleId,
       businessId,
     );

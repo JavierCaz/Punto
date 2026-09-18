@@ -1,3 +1,4 @@
+import { requireCapability, type AuthActor } from '@/auth/permissions';
 import { getDb } from '@/db/client';
 import { LATEST_SCHEMA_VERSION } from '@/db/migrations';
 import { resetBusinessScope } from '@/db/repositories/business-scope';
@@ -101,7 +102,11 @@ async function readSchema(db: DatabaseAdapter): Promise<BackupSchema> {
  * ordered by primary key, so exporting identical data twice yields identical
  * serialized output (given the same `exportedAt`).
  */
-export async function exportDatabase(options: ExportDatabaseOptions = {}): Promise<BackupDocument> {
+export async function exportDatabase(
+  actor: AuthActor,
+  options: ExportDatabaseOptions = {},
+): Promise<BackupDocument> {
+  requireCapability(actor, 'data.export');
   const db = await getDb();
   const schema = await readSchema(db);
   const tables = emptyBackupTables();
@@ -170,9 +175,11 @@ function formatValidationErrors(errors: BackupValidationError[]): string {
  *   caller did not opt into `mode: 'replace'`.
  */
 export async function importDatabase(
+  actor: AuthActor,
   raw: unknown,
   options: ImportDatabaseOptions = {},
 ): Promise<BackupImportResult> {
+  requireCapability(actor, 'data.import');
   const mode = options.mode ?? 'fail';
 
   const db = await getDb();
@@ -248,7 +255,8 @@ async function insertAllRows(
 }
 
 /** Erase all business data. The app returns to first-run onboarding afterwards. */
-export async function clearAllData(): Promise<void> {
+export async function clearAllData(actor: AuthActor): Promise<void> {
+  requireCapability(actor, 'data.erase');
   await withTransaction(async (txn) => {
     await txn.execAsync('PRAGMA defer_foreign_keys = ON');
     await deleteAllRows(txn);

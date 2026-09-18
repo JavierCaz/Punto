@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { useCan } from '@/auth';
+
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
 import { EmptyState } from '@/components/empty-state';
 import { ProductCard } from '@/components/product-card';
@@ -23,6 +25,7 @@ export default function ProductsScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const isTablet = width >= TABLET_BREAKPOINT;
+  const canManage = useCan('catalog.manage');
 
   const { products, categories, recipeProductIds, currency, loading, loadFailed, reload } = useCatalog();
   const [search, setSearch] = useState('');
@@ -60,7 +63,7 @@ export default function ProductsScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerShadowVisible: false,
-          headerRight: renderAdd,
+          headerRight: canManage ? renderAdd : undefined,
         }}
       />
 
@@ -94,8 +97,12 @@ export default function ProductsScreen() {
             icon="silverware-fork-knife"
             title={t('products.emptyTitle')}
             message={t('products.emptyMessage')}
-            actionLabel={t('products.emptyAction')}
-            onActionPress={() => router.push('/products/edit')}
+            {...(canManage
+              ? {
+                  actionLabel: t('products.emptyAction'),
+                  onActionPress: () => router.push('/products/edit'),
+                }
+              : {})}
           />
         </View>
       ) : (
@@ -115,7 +122,7 @@ export default function ProductsScreen() {
               currency={currency}
               hasRecipe={recipeProductIds.has(item.id)}
               variant={isTablet ? 'grid' : 'list'}
-              onPress={() => router.push({ pathname: '/products/edit', params: { id: item.id } })}
+              onPress={canManage ? () => router.push({ pathname: '/products/edit', params: { id: item.id } }) : undefined}
             />
           )}
           ListEmptyComponent={

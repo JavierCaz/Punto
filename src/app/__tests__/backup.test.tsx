@@ -23,6 +23,7 @@ import {
 
 const mockReplace = jest.fn();
 const mockSignOut = jest.fn();
+const mockAdminUser = { id: 'admin-1', role: 'ADMIN' as const };
 const mockResetToOnboarding = jest.fn(async () => {});
 
 jest.mock('expo-router', () => ({
@@ -32,7 +33,7 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/auth', () => ({
   useAuthStore: {
-    getState: () => ({ signOut: mockSignOut, resetToOnboarding: mockResetToOnboarding }),
+    getState: () => ({ user: mockAdminUser, signOut: mockSignOut, resetToOnboarding: mockResetToOnboarding }),
   },
 }));
 
@@ -200,7 +201,7 @@ describe('BackupScreen', () => {
     await fireEvent.press(getByTestId('app-dialog-confirm'));
 
     await waitFor(() =>
-      expect(importDatabase).toHaveBeenCalledWith(document, { mode: 'replace' }),
+      expect(importDatabase).toHaveBeenCalledWith(mockAdminUser, document, { mode: 'replace' }),
     );
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });

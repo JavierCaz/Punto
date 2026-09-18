@@ -60,6 +60,20 @@ export default function SettingsScreen() {
         </ThemedView>
       </View>
 
+      <View style={styles.section}>
+        <SectionHeader level="section" title={t('settings.security')} />
+        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+          <ListRow
+            icon="shield-key-outline"
+            title={t('settings.authorizationPin')}
+            subtitle={t('settings.authorizationPinSubtitle')}
+            onPress={() => router.push('/manager-pin')}
+            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            testID="settings-manager-pin-row"
+          />
+        </ThemedView>
+      </View>
+
       <View style={styles.footer}>
         <ThemedText type="micro" themeColor="textSecondary" style={styles.footerText}>
           {t('common.appName')} — {t('settings.aboutLine')}

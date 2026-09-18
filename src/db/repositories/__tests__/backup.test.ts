@@ -24,6 +24,9 @@ import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-ad
 import { BACKUP_DELETE_ORDER, BACKUP_TABLES, buildBackupDocument, emptyBackupTables } from '@/lib/backup-format';
 import type { BackupTableName } from '@/lib/backup-format';
 
+/** Minimal actor fixture for the authorization asserts. */
+const ADMIN = { role: 'ADMIN' } as const;
+
 jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 
 interface TableInfoRow {
@@ -94,7 +97,7 @@ describe('backup repository', () => {
       queueSchema(adapter);
       queueAllTables(adapter, { product: [{ id: 'p1' }], business: [{ id: 'b1' }] });
 
-      const doc = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
+      const doc = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
 
       expect(doc.schemaVersion).toBe(LATEST_SCHEMA_VERSION);
       expect(doc.exportedAt).toBe('2026-09-17T12:00:00.000Z');
@@ -114,13 +117,20 @@ describe('backup repository', () => {
       queueSchema(adapter);
       queueAllTables(adapter, {});
 
-      await exportDatabase();
+      await exportDatabase(ADMIN);
 
       const selects = adapter.calls.filter((call) => call.sql.startsWith('SELECT'));
       expect(selects).toHaveLength(BACKUP_TABLES.length);
       for (const table of BACKUP_TABLES) {
         expect(selects.some((call) => call.sql.includes(`FROM ${table} `))).toBe(true);
       }
+    });
+
+    it('denies an EMPLOYEE actor before touching the database', async () => {
+      await expect(exportDatabase({ role: 'EMPLOYEE' })).rejects.toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+      expect(adapter.calls).toHaveLength(0);
     });
   });
 
@@ -150,7 +160,7 @@ describe('backup repository', () => {
       queueSchema(adapter);
       adapter.queueFirst('COUNT(*) AS count FROM business', { count: 0 });
 
-      await importDatabase(makeImportDoc([{ id: 'p1', description: null }]), { mode: 'replace' });
+      await importDatabase(ADMIN, makeImportDoc([{ id: 'p1', description: null }]), { mode: 'replace' });
 
       const deletes = adapter.calls
         .filter((call) => call.sql.startsWith('DELETE FROM'))
@@ -174,14 +184,14 @@ describe('backup repository', () => {
       queueSchema(adapter);
       adapter.queueFirst('COUNT(*) AS count FROM business', { count: 0 });
 
-      await expect(importDatabase(makeImportDoc(), { mode: 'fail' })).resolves.toBeDefined();
+      await expect(importDatabase(ADMIN, makeImportDoc(), { mode: 'fail' })).resolves.toBeDefined();
     });
 
     it('refuses a non-empty target with REPO_BACKUP_CONFLICT and writes nothing', async () => {
       queueSchema(adapter);
       adapter.queueFirst('COUNT(*) AS count FROM business', { count: 1 });
 
-      const error = await importDatabase(makeImportDoc()).catch((e: unknown) => e);
+      const error = await importDatabase(ADMIN, makeImportDoc()).catch((e: unknown) => e);
 
       expect(isRepoError(error, REPO_ERROR.BACKUP_CONFLICT)).toBe(true);
       expect(adapter.calls.some((call) => call.sql.startsWith('DELETE FROM'))).toBe(false);
@@ -192,7 +202,7 @@ describe('backup repository', () => {
       adapter.queueFirst('COUNT(*) AS count FROM business', { count: 1 });
 
       await expect(
-        importDatabase(makeImportDoc([{ id: 'p1', description: null }]), { mode: 'replace' }),
+        importDatabase(ADMIN, makeImportDoc([{ id: 'p1', description: null }]), { mode: 'replace' }),
       ).resolves.toEqual({ stats: expect.objectContaining({ totalRows: 1 }) });
       expect(adapter.calls.some((call) => call.sql.startsWith('DELETE FROM'))).toBe(true);
     });
@@ -201,7 +211,7 @@ describe('backup repository', () => {
       queueSchema(adapter);
 
       const invalid = { ...makeImportDoc(), format: 'wrong' };
-      const error = await importDatabase(invalid).catch((e: unknown) => e);
+      const error = await importDatabase(ADMIN, invalid).catch((e: unknown) => e);
 
       expect(isRepoError(error, REPO_ERROR.BACKUP_INVALID)).toBe(true);
       expect(adapter.calls.some((call) => call.sql.startsWith('DELETE FROM'))).toBe(false);
@@ -217,7 +227,7 @@ describe('backup repository', () => {
         return { changes: 1, lastInsertRowId: 1 };
       }) as unknown as RecordingAdapter['runAsync'];
 
-      const error = await importDatabase(makeImportDoc([{ id: 'p1', description: null }]), {
+      const error = await importDatabase(ADMIN, makeImportDoc([{ id: 'p1', description: null }]), {
         mode: 'replace',
       }).catch((e: unknown) => e);
 
@@ -227,7 +237,7 @@ describe('backup repository', () => {
 
   describe('clearAllData', () => {
     it('deletes every table children-first', async () => {
-      await clearAllData();
+      await clearAllData(ADMIN);
 
       const deletes = adapter.calls
         .filter((call) => call.sql.startsWith('DELETE FROM'))

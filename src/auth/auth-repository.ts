@@ -1,8 +1,9 @@
 import * as Crypto from 'expo-crypto';
 
-import { loginLimiter } from '@/auth/lockout';
+import { ForbiddenError, requireCapability } from '@/auth/permissions';
+import { loginLimiter, MANAGER_PIN_LIMITER_KEY, managerPinLimiter } from '@/auth/lockout';
 import { normalizeUsername, isAuthRole } from '@/auth/validation';
-import type { AuthRole } from '@/auth/types';
+import type { AuthRole, SessionUser } from '@/auth/types';
 import { buildUpdateAssignments, getDb, withTransaction } from '@/db';
 import { verifySecret, needsRehash, hashSecret } from '@/lib/hash';
 
@@ -411,6 +412,15 @@ export interface UpdateEmployeeInput {
  */
 export async function archiveEmployee(actorEmployeeId: string, targetEmployeeId: string): Promise<void> {
   await withTransaction(async (txn) => {
+    // Authorization (defense in depth): only an active ADMIN may archive.
+    const actor = await txn.getFirstAsync<{ role: string }>(
+      'SELECT role FROM employee WHERE id = ? AND archived_at IS NULL AND is_active = 1 LIMIT 1',
+      actorEmployeeId,
+    );
+    if (actor?.role !== 'ADMIN') {
+      throw new ForbiddenError('team.manage');
+    }
+
     const target = await txn.getFirstAsync<Record<string, unknown>>(
       `SELECT ${EMPLOYEE_COLUMNS} FROM employee WHERE id = ?`,
       targetEmployeeId,
@@ -439,3 +449,105 @@ export async function archiveEmployee(actorEmployeeId: string, targetEmployeeId:
 
 export type PublicEmployee = ReturnType<typeof toPublicEmployee>;
 export type { EmployeeRow };
+
+// ---------------------------------------------------------------------------
+// Manager authorization PIN (employee-initiated refund overrides)
+// ---------------------------------------------------------------------------
+
+/** Result of verifying a manager's authorization PIN. */
+export type ManagerPinResult =
+  | { ok: true; adminId: string }
+  | { ok: false; code: 'invalid' | 'no-pin-configured' | 'locked'; retryAfterSec?: number };
+
+/** True when the given admin has configured an authorization PIN. */
+export async function hasAuthorizationPin(adminId: string): Promise<boolean> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ authorization_pin_hash: string | null }>(
+    `SELECT authorization_pin_hash FROM employee
+      WHERE id = ? AND role = 'ADMIN' AND archived_at IS NULL LIMIT 1`,
+    adminId,
+  );
+  return row?.authorization_pin_hash != null;
+}
+
+/** Set/replace the signed-in admin's authorization PIN. ADMIN-only. */
+export async function setAuthorizationPin(
+  actor: SessionUser | null,
+  pinHash: string,
+): Promise<void> {
+  if (!actor) {
+    throw new ForbiddenError('settings.manage');
+  }
+  requireCapability(actor, 'settings.manage');
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE employee SET authorization_pin_hash = ?, updated_at = ?
+      WHERE id = ? AND role = 'ADMIN' AND archived_at IS NULL`,
+    pinHash,
+    nowIso(),
+    actor.id,
+  );
+}
+
+/**
+ * Verify an authorization PIN against every active ADMIN that has one.
+ *
+ * Security notes (Oracle-reviewed):
+ * - Full scan with NO early exit, so the PBKDF2 work is the same regardless of
+ *   which admin (if any) matched — a timing observer learns only how many
+ *   admins have a PIN, which is not sensitive.
+ * - Throttled globally by {@link managerPinLimiter} (in-memory, survives
+ *   sign-out) to blunt on-screen guessing.
+ * - `no-pin-configured` is distinct from `invalid` so the caller can tell an
+ *   employee to ask an admin to set one, instead of showing "wrong PIN".
+ */
+export async function verifyManagerAuthorizationPin(pin: string): Promise<ManagerPinResult> {
+  const retryAfterSec = managerPinLimiter.retryAfterSec(MANAGER_PIN_LIMITER_KEY);
+  if (retryAfterSec > 0) {
+    return { ok: false, code: 'locked', retryAfterSec };
+  }
+
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ id: string; authorization_pin_hash: string }>(
+    `SELECT id, authorization_pin_hash FROM employee
+      WHERE role = 'ADMIN' AND archived_at IS NULL AND is_active = 1
+        AND authorization_pin_hash IS NOT NULL
+      ORDER BY created_at ASC, id ASC`,
+  );
+  if (rows.length === 0) {
+    return { ok: false, code: 'no-pin-configured' };
+  }
+
+  let matchedId: string | null = null;
+  let matchedHash: string | null = null;
+  for (const row of rows) {
+    const valid = await verifySecret(pin, row.authorization_pin_hash);
+    if (valid && matchedId === null) {
+      matchedId = row.id;
+      matchedHash = row.authorization_pin_hash;
+    }
+  }
+
+  if (matchedId === null) {
+    managerPinLimiter.recordFailure(MANAGER_PIN_LIMITER_KEY);
+    const remaining = managerPinLimiter.retryAfterSec(MANAGER_PIN_LIMITER_KEY);
+    return remaining > 0
+      ? { ok: false, code: 'locked', retryAfterSec: remaining }
+      : { ok: false, code: 'invalid' };
+  }
+
+  managerPinLimiter.recordSuccess(MANAGER_PIN_LIMITER_KEY);
+
+  // Transparently upgrade a weak legacy hash on success (mirrors signIn).
+  if (matchedHash != null && needsRehash(matchedHash)) {
+    const upgraded = await hashSecret(pin);
+    await db.runAsync(
+      'UPDATE employee SET authorization_pin_hash = ?, updated_at = ? WHERE id = ?',
+      upgraded,
+      nowIso(),
+      matchedId,
+    );
+  }
+
+  return { ok: true, adminId: matchedId };
+}

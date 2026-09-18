@@ -85,7 +85,7 @@ export default function BackupScreen() {
 
     async function load() {
       try {
-        const document = await exportDatabase();
+        const document = await exportDatabase(useAuthStore.getState().user);
         const empty = await isDatabaseEmpty();
         if (cancelled) {
           return;
@@ -113,7 +113,7 @@ export default function BackupScreen() {
   const handleExport = useCallback(async () => {
     setBusy(true);
     try {
-      const document = await exportDatabase({ appVersion });
+      const document = await exportDatabase(useAuthStore.getState().user, { appVersion });
       const json = serializeBackup(document);
       const uri = writeBackupFile(json, buildBackupFileName());
 
@@ -146,7 +146,7 @@ export default function BackupScreen() {
   const handleCopy = useCallback(async () => {
     setBusy(true);
     try {
-      const document = await exportDatabase({ appVersion });
+      const document = await exportDatabase(useAuthStore.getState().user, { appVersion });
       await copyBackupToClipboard(serializeBackup(document));
       showMessage({
         title: t('backup.copySuccessTitle'),
@@ -168,7 +168,7 @@ export default function BackupScreen() {
     async (document: BackupDocument) => {
       setBusy(true);
       try {
-        await importDatabase(document, { mode: 'replace' });
+        await importDatabase(useAuthStore.getState().user, document, { mode: 'replace' });
 
         // Imported admin credentials are foreign to this session: return to login.
         useAuthStore.getState().signOut();
@@ -250,7 +250,7 @@ export default function BackupScreen() {
   const performErase = useCallback(async () => {
     setBusy(true);
     try {
-      await clearAllData();
+      await clearAllData(useAuthStore.getState().user);
       await useAuthStore.getState().resetToOnboarding();
       router.replace('/onboarding');
       showMessage({

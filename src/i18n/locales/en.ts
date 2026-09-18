@@ -485,6 +485,9 @@ const en: typeof es = {
     },
     business: 'Business',
     data: 'Data',
+    security: 'Security',
+    authorizationPin: 'Authorization PIN',
+    authorizationPinSubtitle: 'Authorize employee refunds with a manager PIN',
     aboutLine: 'Made for local businesses · Your data lives only on this device.',
   },
 
@@ -531,6 +534,38 @@ const en: typeof es = {
       invalid: 'The file is not compatible with this version of Punto.',
       conflict: 'There is already data on this device.',
       parse: "We couldn't read the file. Check that it is valid JSON.",
+    },
+  },
+
+  managerPin: {
+    title: 'Authorization PIN',
+    subtitle: 'Set a PIN to authorize refunds from your employees.',
+    statusSet: 'The authorization PIN is active.',
+    statusUnset: 'No authorization PIN is set yet.',
+    pinLabel: 'New PIN',
+    confirmLabel: 'Confirm PIN',
+    pinHint: '4 to 6 digits. You will be asked for it to authorize refunds.',
+    save: 'Save PIN',
+    savedTitle: 'PIN saved',
+    savedMessage: 'Your authorization PIN has been updated.',
+    errors: {
+      pinInvalid: 'PIN must be 4 to 6 digits.',
+      pinMismatch: 'The PINs do not match.',
+      failed: "We couldn't save the PIN. Try again.",
+    },
+  },
+
+  refundAuth: {
+    title: 'Manager authorization',
+    message: 'Ask a manager to enter their PIN to authorize this refund.',
+    pinLabel: 'Manager PIN',
+    pinPlaceholder: '4 to 6 digits',
+    authorize: 'Authorize refund',
+    errors: {
+      invalid: 'Incorrect PIN.',
+      invalidFormat: 'PIN must be 4 to 6 digits.',
+      noPin: 'No manager has set an authorization PIN.',
+      locked: 'Too many attempts. Wait {{seconds}} s and try again.',
     },
   },
 

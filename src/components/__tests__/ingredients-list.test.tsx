@@ -12,6 +12,10 @@ import IngredientsScreen from '@/app/ingredients/index';
 import { ensureDefaultUnits, listInventoryItems, listUnits, type InventoryItem, type Unit } from '@/db';
 import { i18n } from '@/i18n';
 
+// Admin session: the create affordances are visible (employee gating is
+// covered by the permissions unit tests and the inventory/receipt screens).
+jest.mock('@/auth', () => ({ useCan: () => true }));
+
 jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageCode: 'es' }],
 }));

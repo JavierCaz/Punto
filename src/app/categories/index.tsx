@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { useCan } from '@/auth';
+
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -18,6 +20,7 @@ import { canMoveCategory, reorderCategories, type ReorderDirection } from '@/lib
 export default function CategoriesScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const canManage = useCan('catalog.manage');
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +83,7 @@ export default function CategoriesScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerShadowVisible: false,
-          headerRight: renderAdd,
+          headerRight: canManage ? renderAdd : undefined,
         }}
       />
 
@@ -106,8 +109,12 @@ export default function CategoriesScreen() {
             icon="tag-outline"
             title={t('categories.emptyTitle')}
             message={t('categories.emptyMessage')}
-            actionLabel={t('categories.add')}
-            onActionPress={() => router.push('/categories/edit')}
+            {...(canManage
+              ? {
+                  actionLabel: t('categories.add'),
+                  onActionPress: () => router.push('/categories/edit'),
+                }
+              : {})}
           />
         </View>
       ) : (
@@ -120,7 +127,7 @@ export default function CategoriesScreen() {
               <View style={styles.row}>
                 <Pressable
                   accessibilityRole="button"
-                  disabled={savingOrder}
+                  disabled={savingOrder || !canManage}
                   onPress={() => router.push({ pathname: '/categories/edit', params: { id: category.id } })}
                   style={({ pressed }) => [styles.rowMain, pressed && styles.pressed]}>
                   <MaterialCommunityIcons name="tag-outline" size={22} color={theme.textSecondary} />
@@ -129,41 +136,45 @@ export default function CategoriesScreen() {
                   </ThemedText>
                 </Pressable>
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('categories.moveUp')}
-                  disabled={savingOrder || !canMoveCategory(categories, category.id, 'up')}
-                  hitSlop={Spacing.one}
-                  onPress={() => void move(category.id, 'up')}
-                  style={styles.reorderButton}>
-                  <MaterialCommunityIcons
-                    name="chevron-up"
-                    size={24}
-                    color={
-                      canMoveCategory(categories, category.id, 'up') && !savingOrder
-                        ? theme.text
-                        : theme.border
-                    }
-                  />
-                </Pressable>
+                {canManage ? (
+                  <>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('categories.moveUp')}
+                      disabled={savingOrder || !canMoveCategory(categories, category.id, 'up')}
+                      hitSlop={Spacing.one}
+                      onPress={() => void move(category.id, 'up')}
+                      style={styles.reorderButton}>
+                      <MaterialCommunityIcons
+                        name="chevron-up"
+                        size={24}
+                        color={
+                          canMoveCategory(categories, category.id, 'up') && !savingOrder
+                            ? theme.text
+                            : theme.border
+                        }
+                      />
+                    </Pressable>
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('categories.moveDown')}
-                  disabled={savingOrder || !canMoveCategory(categories, category.id, 'down')}
-                  hitSlop={Spacing.one}
-                  onPress={() => void move(category.id, 'down')}
-                  style={styles.reorderButton}>
-                  <MaterialCommunityIcons
-                    name="chevron-down"
-                    size={24}
-                    color={
-                      canMoveCategory(categories, category.id, 'down') && !savingOrder
-                        ? theme.text
-                        : theme.border
-                    }
-                  />
-                </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('categories.moveDown')}
+                      disabled={savingOrder || !canMoveCategory(categories, category.id, 'down')}
+                      hitSlop={Spacing.one}
+                      onPress={() => void move(category.id, 'down')}
+                      style={styles.reorderButton}>
+                      <MaterialCommunityIcons
+                        name="chevron-down"
+                        size={24}
+                        color={
+                          canMoveCategory(categories, category.id, 'down') && !savingOrder
+                            ? theme.text
+                            : theme.border
+                        }
+                      />
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
             </View>
           ))}

@@ -490,6 +490,9 @@ export default {
     },
     business: 'Negocio',
     data: 'Datos',
+    security: 'Seguridad',
+    authorizationPin: 'PIN de autorización',
+    authorizationPinSubtitle: 'Autoriza reembolsos de empleados con un PIN de gerente',
     aboutLine: 'Hecho para negocios locales · Tus datos viven solo en este dispositivo.',
   },
 
@@ -536,6 +539,38 @@ export default {
       invalid: 'El archivo no es compatible con esta versión de Punto.',
       conflict: 'Ya existen datos en este dispositivo.',
       parse: 'No pudimos leer el archivo. Verifica que sea un JSON válido.',
+    },
+  },
+
+  managerPin: {
+    title: 'PIN de autorización',
+    subtitle: 'Establece un PIN para autorizar los reembolsos de tus empleados.',
+    statusSet: 'El PIN de autorización está activo.',
+    statusUnset: 'Aún no hay un PIN de autorización configurado.',
+    pinLabel: 'Nuevo PIN',
+    confirmLabel: 'Confirmar PIN',
+    pinHint: 'De 4 a 6 dígitos. Lo pedirás al autorizar reembolsos.',
+    save: 'Guardar PIN',
+    savedTitle: 'PIN guardado',
+    savedMessage: 'Tu PIN de autorización quedó actualizado.',
+    errors: {
+      pinInvalid: 'El PIN debe tener de 4 a 6 dígitos.',
+      pinMismatch: 'Los PIN no coinciden.',
+      failed: 'No pudimos guardar el PIN. Inténtalo de nuevo.',
+    },
+  },
+
+  refundAuth: {
+    title: 'Autorización del gerente',
+    message: 'Pide a un gerente que ingrese su PIN para autorizar este reembolso.',
+    pinLabel: 'PIN del gerente',
+    pinPlaceholder: '4 a 6 dígitos',
+    authorize: 'Autorizar reembolso',
+    errors: {
+      invalid: 'PIN incorrecto.',
+      invalidFormat: 'El PIN debe tener de 4 a 6 dígitos.',
+      noPin: 'Ningún gerente ha configurado un PIN de autorización.',
+      locked: 'Demasiados intentos. Espera {{seconds}} s e inténtalo de nuevo.',
     },
   },
 

@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { useCan } from '@/auth';
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
 import { EmptyState } from '@/components/empty-state';
 import { PrimaryButton } from '@/components/primary-button';
@@ -31,6 +32,8 @@ import { formatQuantityMilli } from '@/lib/catalog-form';
 export default function InventoryScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const canManageOperations = useCan('operations.manage');
+  const canManageCatalog = useCan('catalog.manage');
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -108,8 +111,12 @@ export default function InventoryScreen() {
             icon="package-variant-closed"
             title={t('inventory.emptyTitle')}
             message={t('inventory.emptyMessage')}
-            actionLabel={t('inventory.emptyAction')}
-            onActionPress={() => router.push('/ingredients')}
+            {...(canManageCatalog
+              ? {
+                  actionLabel: t('inventory.emptyAction'),
+                  onActionPress: () => router.push('/ingredients'),
+                }
+              : {})}
           />
         </View>
       ) : (
@@ -167,11 +174,13 @@ export default function InventoryScreen() {
           }
         />
       )}
-      <PrimaryButton
-        label={t('inventory.purchase')}
-        icon="cart-plus"
-        onPress={() => router.push('/purchases/edit')}
-      />
+      {canManageOperations ? (
+        <PrimaryButton
+          label={t('inventory.purchase')}
+          icon="cart-plus"
+          onPress={() => router.push('/purchases/edit')}
+        />
+      ) : null}
 
     </Screen>
   );

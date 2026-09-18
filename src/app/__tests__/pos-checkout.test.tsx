@@ -39,6 +39,7 @@ jest.mock('@/auth', () => ({
   listActiveEmployees: jest.fn(async () => []),
   useAuthStore: (selector: (state: unknown) => unknown) =>
     selector({ user: { id: 'emp-1', firstName: 'Ana', lastName: null, role: 'ADMIN' } }),
+  useCan: () => true,
 }));
 
 const mockCatalog = {

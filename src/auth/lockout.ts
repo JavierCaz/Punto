@@ -69,3 +69,14 @@ export class LoginLimiter {
 }
 
 export const loginLimiter = new LoginLimiter();
+
+/**
+ * Manager-authorization PIN limiter (employee-initiated refund overrides).
+ *
+ * Same in-memory rationale as {@link loginLimiter}, but keyed globally because
+ * the authorization prompt has no username. Deliberately NOT cleared on
+ * sign-out: otherwise an employee could reset the lockout by signing out and
+ * back in.
+ */
+export const MANAGER_PIN_LIMITER_KEY = 'manager-pin';
+export const managerPinLimiter = new LoginLimiter();

@@ -9,6 +9,7 @@ import { i18n } from '@/i18n';
 import { formatMoney } from '@/i18n/format';
 
 const mockPush = jest.fn();
+const mockUseCan = jest.fn(() => true);
 
 jest.mock('expo-router', () => ({
   router: {
@@ -32,6 +33,7 @@ jest.mock('@/db', () => ({
 
 jest.mock('@/auth', () => ({
   listActiveEmployees: jest.fn(),
+  useCan: () => mockUseCan(),
 }));
 
 jest.mock('expo-localization', () => ({
@@ -109,6 +111,7 @@ const mockListEmployees = listActiveEmployees as jest.MockedFunction<typeof list
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseCan.mockReturnValue(true);
   mockGetProfile.mockResolvedValue({ currencyCode: 'MXN' } as Awaited<
     ReturnType<typeof getBusinessProfile>
   >);
@@ -210,6 +213,23 @@ describe('SalesScreen', () => {
     );
     expect(mockGetSalesTotals).toHaveBeenCalledWith(
       expect.objectContaining({ employeeId: 'emp-1' }),
+    );
+  });
+
+  it('limits an employee to Today and 7 days date filters', async () => {
+    mockUseCan.mockReturnValue(false);
+
+    const { getByTestId, queryByTestId } = await render(<SalesScreen />);
+
+    await waitFor(() => expect(getByTestId('sales-date-today')).toBeTruthy());
+    expect(getByTestId('sales-date-last7')).toBeTruthy();
+    expect(queryByTestId('sales-date-all')).toBeNull();
+    expect(queryByTestId('sales-date-last30')).toBeNull();
+    // The default range becomes Today, so the query carries today's bounds.
+    await waitFor(() =>
+      expect(mockListSales).toHaveBeenCalledWith(
+        expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
+      ),
     );
   });
 });

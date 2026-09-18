@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { listActiveEmployees, useAuthStore } from '@/auth';
+import { listActiveEmployees, useAuthStore, useCan } from '@/auth';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { CartPanel } from '@/components/cart-panel';
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
@@ -84,6 +84,7 @@ export default function PosScreen() {
   const cartTotal = cartSubtotalMinor(lines);
 
   const isAdmin = user?.role === 'ADMIN';
+  const canManageSales = useCan('sales.refund');
   const attributedEmployee = employees.find((employee) => employee.id === cartEmployeeId);
   const employeeName = attributedEmployee
     ? fullName(attributedEmployee.firstName, attributedEmployee.lastName)
@@ -267,7 +268,9 @@ export default function PosScreen() {
             </ThemedText>
             <ThemedText type="code">{formatMoney(held.totalMinor, currency)}</ThemedText>
           </Pressable>
-          <SecondaryButton label={t('pos.held.discard')} onPress={() => void discardHeld(held.id)} />
+          {canManageSales || held.id === cartSaleId ? (
+            <SecondaryButton label={t('pos.held.discard')} onPress={() => void discardHeld(held.id)} />
+          ) : null}
         </View>
       ))
     );

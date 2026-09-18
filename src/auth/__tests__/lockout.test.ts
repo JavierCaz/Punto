@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { LoginLimiter, DEFAULT_LOCKOUT } from '@/auth/lockout';
+import { LoginLimiter, DEFAULT_LOCKOUT, loginLimiter, MANAGER_PIN_LIMITER_KEY, managerPinLimiter } from '@/auth/lockout';
 
 /** Deterministic clock starting at t=0. */
 function makeClock() {
@@ -67,5 +67,23 @@ describe('LoginLimiter', () => {
     const limiter = new LoginLimiter(DEFAULT_LOCKOUT, () => 0);
     expect(limiter.recordFailure('ana').failures).toBe(1);
     expect(limiter.recordFailure('ana').failures).toBe(2);
+  });
+});
+
+describe('managerPinLimiter', () => {
+  it('is a separate instance that survives the login limiter being cleared', () => {
+    managerPinLimiter.clear();
+    loginLimiter.clear();
+
+    for (let i = 0; i < DEFAULT_LOCKOUT.maxAttempts; i++) {
+      managerPinLimiter.recordFailure(MANAGER_PIN_LIMITER_KEY);
+    }
+    expect(managerPinLimiter.isLocked(MANAGER_PIN_LIMITER_KEY)).toBe(true);
+
+    // Sign-out clears the login limiter but must NOT reset the manager limiter.
+    loginLimiter.clear();
+    expect(managerPinLimiter.isLocked(MANAGER_PIN_LIMITER_KEY)).toBe(true);
+
+    managerPinLimiter.clear();
   });
 });

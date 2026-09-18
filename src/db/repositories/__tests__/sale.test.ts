@@ -22,6 +22,7 @@ import {
   getSalesTotals,
   listSales,
   refundSale,
+  refundSaleAuthorized,
   removeSaleItem,
   updateSaleItemQuantity,
 } from '@/db/repositories/sale';
@@ -31,6 +32,9 @@ import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-ad
 
 jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn(() => 'uuid-test') }));
+
+/** Minimal actor fixture for the authorization asserts. */
+const ADMIN = { role: 'ADMIN' } as const;
 
 /** A canonical HELD sale row as SQLite would surface it (snake_case). */
 const SALE_ROW = {
@@ -670,7 +674,7 @@ describe('sale repository', () => {
       adapter.queueFirst('FROM inventory_item', { id: 'inv-2', unit_id: 'u2', current_quantity: 100 });
       adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
 
-      await refundSale('sale-1');
+      await refundSale(ADMIN, 'sale-1');
 
       const movements = adapter.calls.filter((c) => c.sql.includes('INSERT INTO inventory_movement'));
       expect(movements).toHaveLength(2);
@@ -699,7 +703,7 @@ describe('sale repository', () => {
       adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
       adapter.queueFirst('FROM sale', { ...SALE_ROW, status: 'HELD' });
 
-      const error = await refundSale('sale-1').catch((e: unknown) => e);
+      const error = await refundSale(ADMIN, 'sale-1').catch((e: unknown) => e);
       expect(isRepoError(error, REPO_ERROR.INVALID_STATE)).toBe(true);
       expect(adapter.calls.some((c) => c.sql.includes('INSERT INTO inventory_movement'))).toBe(false);
       expect(adapter.calls.some((c) => c.sql.includes('UPDATE sale'))).toBe(false);
@@ -709,7 +713,7 @@ describe('sale repository', () => {
       adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
       adapter.queueFirst('FROM sale', { ...SALE_ROW, status: 'COMPLETED', employee_id: 'emp-1' });
 
-      await refundSale('sale-1', { restoreInventory: false });
+      await refundSale(ADMIN, 'sale-1', { restoreInventory: false });
 
       // No ledger reads and no RETURN movements: the original SALE stays as the
       // record of consumption.
@@ -719,9 +723,48 @@ describe('sale repository', () => {
       const statusCall = adapter.calls.find((c) => c.sql.includes("status = 'REFUNDED'"));
       expect(statusCall).toBeDefined();
       expect(statusCall!.sql).toContain('inventory_restored = ?');
+      expect(statusCall!.sql).toContain('refund_authorized_by = ?');
       expect(statusCall!.params[2]).toBe(0);
-      expect(statusCall!.params[3]).toBe('sale-1');
-      expect(statusCall!.params[4]).toBe('biz-1');
+      expect(statusCall!.params[3]).toBeNull(); // direct refund has no authorizer
+      expect(statusCall!.params[4]).toBe('sale-1');
+      expect(statusCall!.params[5]).toBe('biz-1');
+    });
+  });
+
+  describe('refundSaleAuthorized', () => {
+    it('re-validates the authorizing admin, stamps the audit field, and attributes movements to the performer', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('SELECT id FROM employee', { id: 'admin-1' });
+      adapter.queueFirst('FROM sale', { ...SALE_ROW, status: 'COMPLETED', employee_id: 'emp-1' });
+      adapter.queueAll('FROM inventory_movement', [
+        { inventory_item_id: 'inv-1', quantity: -200, unit_cost_minor: 50 },
+      ]);
+      adapter.queueFirst('FROM inventory_item', { id: 'inv-1', unit_id: 'u1', current_quantity: 100 });
+      adapter.queueFirst('allow_negative_inventory', { allow_negative_inventory: 0 });
+
+      await refundSaleAuthorized('admin-1', 'sale-1', {
+        employeeId: 'emp-9',
+        restoreInventory: true,
+      });
+
+      const statusCall = adapter.calls.find((c) => c.sql.includes("status = 'REFUNDED'"));
+      expect(statusCall).toBeDefined();
+      expect(statusCall!.params[3]).toBe('admin-1'); // refund_authorized_by
+      expect(statusCall!.params[4]).toBe('sale-1');
+      expect(statusCall!.params[5]).toBe('biz-1');
+
+      const movement = adapter.calls.find((c) => c.sql.includes('INSERT INTO inventory_movement'));
+      expect(movement).toBeDefined();
+      expect(movement!.params[11]).toBe('emp-9'); // performer, not the original seller
+    });
+
+    it('throws ForbiddenError when the authorizer is not an active admin', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('SELECT id FROM employee', null);
+
+      const error = await refundSaleAuthorized('ghost', 'sale-1').catch((e: unknown) => e);
+      expect(error).toMatchObject({ code: 'AUTH_FORBIDDEN' });
+      expect(adapter.calls.some((c) => c.sql.includes("status = 'REFUNDED'"))).toBe(false);
     });
   });
 

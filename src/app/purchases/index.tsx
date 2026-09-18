@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { useCan } from '@/auth';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -29,6 +30,7 @@ import { formatDate, formatMoney } from '@/i18n/format';
 export default function PurchasesScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const canManage = useCan('operations.manage');
 
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -87,7 +89,7 @@ export default function PurchasesScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerShadowVisible: false,
-          headerRight: renderAdd,
+          headerRight: canManage ? renderAdd : undefined,
         }}
       />
 
@@ -113,8 +115,12 @@ export default function PurchasesScreen() {
             icon="cart-outline"
             title={t('purchases.emptyTitle')}
             message={t('purchases.emptyMessage')}
-            actionLabel={t('purchases.emptyAction')}
-            onActionPress={() => router.push('/purchases/edit')}
+            {...(canManage
+              ? {
+                  actionLabel: t('purchases.emptyAction'),
+                  onActionPress: () => router.push('/purchases/edit'),
+                }
+              : {})}
           />
         </View>
       ) : (

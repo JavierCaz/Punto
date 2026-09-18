@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { useCan } from '@/auth';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -30,6 +31,7 @@ import { formatDate, formatMoney } from '@/i18n/format';
 export default function ExpensesScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const canManage = useCan('operations.manage');
 
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [categories, setCategories] = useState<FinancialCategory[]>([]);
@@ -100,7 +102,7 @@ export default function ExpensesScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerShadowVisible: false,
-          headerRight: renderAdd,
+          headerRight: canManage ? renderAdd : undefined,
         }}
       />
 
@@ -126,8 +128,12 @@ export default function ExpensesScreen() {
             icon="cash-minus"
             title={t('expenses.emptyTitle')}
             message={t('expenses.emptyMessage')}
-            actionLabel={t('expenses.emptyAction')}
-            onActionPress={() => router.push('/expenses/edit')}
+            {...(canManage
+              ? {
+                  actionLabel: t('expenses.emptyAction'),
+                  onActionPress: () => router.push('/expenses/edit'),
+                }
+              : {})}
           />
         </View>
       ) : (

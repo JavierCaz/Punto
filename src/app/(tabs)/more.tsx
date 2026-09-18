@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
-import { useAuthStore } from '@/auth';
+import { useAuthStore, useCan } from '@/auth';
 import { showConfirm } from '@/dialog';
 import { ListRow } from '@/components/list-row';
 import { Screen } from '@/components/screen';
@@ -24,7 +24,10 @@ export default function MoreScreen() {
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
 
-  const isAdmin = user?.role === 'ADMIN';
+  const canManageTeam = useCan('team.manage');
+  const canManageSettings = useCan('settings.manage');
+  const canManageCatalog = useCan('catalog.manage');
+  const canManageOperations = useCan('operations.manage');
 
   const confirmSignOut = () => {
     showConfirm({
@@ -60,7 +63,7 @@ export default function MoreScreen() {
         </View>
       ) : null}
 
-      {isAdmin ? (
+      {canManageTeam ? (
         <View style={styles.section}>
           <SectionHeader level="section" title={t('more.team')} />
           <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
@@ -75,76 +78,82 @@ export default function MoreScreen() {
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <SectionHeader level="section" title={t('more.catalog')} />
-        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <ListRow
-            icon="silverware-fork-knife"
-            title={t('more.products')}
-            subtitle={t('products.subtitle')}
-            onPress={() => router.push('/products')}
-            divided
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-          <ListRow
-            icon="tag-outline"
-            title={t('more.categories')}
-            subtitle={t('categories.subtitle')}
-            onPress={() => router.push('/categories')}
-            divided
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-          <ListRow
-            icon="package-variant-closed"
-            title={t('more.ingredients')}
-            subtitle={t('more.ingredientsSubtitle')}
-            onPress={() => router.push('/ingredients')}
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-        </ThemedView>
-      </View>
+      {canManageCatalog ? (
+        <View style={styles.section}>
+          <SectionHeader level="section" title={t('more.catalog')} />
+          <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+            <ListRow
+              icon="silverware-fork-knife"
+              title={t('more.products')}
+              subtitle={t('products.subtitle')}
+              onPress={() => router.push('/products')}
+              divided
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+            <ListRow
+              icon="tag-outline"
+              title={t('more.categories')}
+              subtitle={t('categories.subtitle')}
+              onPress={() => router.push('/categories')}
+              divided
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+            <ListRow
+              icon="package-variant-closed"
+              title={t('more.ingredients')}
+              subtitle={t('more.ingredientsSubtitle')}
+              onPress={() => router.push('/ingredients')}
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+          </ThemedView>
+        </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <SectionHeader level="section" title={t('more.operations')} />
-        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <ListRow
-            icon="truck-outline"
-            title={t('more.suppliers')}
-            subtitle={t('more.suppliersSubtitle')}
-            onPress={() => router.push('/suppliers')}
-            divided
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-          <ListRow
-            icon="truck-delivery-outline"
-            title={t('more.purchases')}
-            subtitle={t('more.purchasesSubtitle')}
-            onPress={() => router.push('/purchases')}
-            divided
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-          <ListRow
-            icon="cash-minus"
-            title={t('more.expenses')}
-            subtitle={t('more.expensesSubtitle')}
-            onPress={() => router.push('/expenses')}
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-        </ThemedView>
-      </View>
+      {canManageOperations ? (
+        <View style={styles.section}>
+          <SectionHeader level="section" title={t('more.operations')} />
+          <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+            <ListRow
+              icon="truck-outline"
+              title={t('more.suppliers')}
+              subtitle={t('more.suppliersSubtitle')}
+              onPress={() => router.push('/suppliers')}
+              divided
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+            <ListRow
+              icon="truck-delivery-outline"
+              title={t('more.purchases')}
+              subtitle={t('more.purchasesSubtitle')}
+              onPress={() => router.push('/purchases')}
+              divided
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+            <ListRow
+              icon="cash-minus"
+              title={t('more.expenses')}
+              subtitle={t('more.expensesSubtitle')}
+              onPress={() => router.push('/expenses')}
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+          </ThemedView>
+        </View>
+      ) : null}
 
-      <View style={styles.section}>
-        <SectionHeader level="section" title={t('settings.entry')} />
-        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <ListRow
-            icon="cog-outline"
-            title={t('settings.entry')}
-            subtitle={t('more.settingsSubtitle')}
-            onPress={() => router.push('/settings')}
-            trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
-          />
-        </ThemedView>
-      </View>
+      {canManageSettings ? (
+        <View style={styles.section}>
+          <SectionHeader level="section" title={t('settings.entry')} />
+          <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+            <ListRow
+              icon="cog-outline"
+              title={t('settings.entry')}
+              subtitle={t('more.settingsSubtitle')}
+              onPress={() => router.push('/settings')}
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+          </ThemedView>
+        </View>
+      ) : null}
 
       {user ? (
         <View style={styles.section}>
@@ -159,19 +168,21 @@ export default function MoreScreen() {
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
-          <ListRow
-            icon="information-outline"
-            title={t('more.about')}
-            trailing={
-              <ThemedText type="body2" themeColor="textSecondary">
-                {t('common.appName')}
-              </ThemedText>
-            }
-          />
-        </ThemedView>
-      </View>
+      {canManageSettings ? (
+        <View style={styles.section}>
+          <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+            <ListRow
+              icon="information-outline"
+              title={t('more.about')}
+              trailing={
+                <ThemedText type="body2" themeColor="textSecondary">
+                  {t('common.appName')}
+                </ThemedText>
+              }
+            />
+          </ThemedView>
+        </View>
+      ) : null}
     </Screen>
   );
 }

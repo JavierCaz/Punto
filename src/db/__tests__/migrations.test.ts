@@ -115,4 +115,12 @@ describe('migration registry', () => {
     expect(sql).toMatch(/ALTER TABLE sale ADD COLUMN inventory_restored INTEGER/);
     expect(sql).toMatch(/CHECK \(inventory_restored IN \(0, 1\)\)/);
   });
+
+  it('adds manager refund authorization (migration 004)', () => {
+    const sql = migrations.flatMap((m: Migration) => m.up).join('\n');
+
+    expect(sql).toMatch(/ALTER TABLE employee ADD COLUMN authorization_pin_hash TEXT/);
+    expect(sql).toMatch(/ALTER TABLE sale ADD COLUMN refund_authorized_by TEXT/);
+    expect(sql).toMatch(/REFERENCES employee\(id\) ON DELETE SET NULL/);
+  });
 });

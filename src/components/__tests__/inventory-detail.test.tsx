@@ -20,6 +20,12 @@ import {
 import type { InventoryItem, InventoryMovement, Supplier, Unit } from '@/db';
 import { i18n } from '@/i18n';
 
+// Configurable capability stub: true by default (ADMIN), flipped off in the
+// authorization test to prove the adjustment form is hidden for employees.
+const mockUseCan = jest.fn(() => true);
+
+jest.mock('@/auth', () => ({ useCan: () => mockUseCan() }));
+
 const mockHeaderOptions = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -186,6 +192,7 @@ const freeTextAdjustment: InventoryMovement = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseCan.mockReturnValue(true);
   mockGetItem.mockResolvedValue(item);
   mockListUnits.mockResolvedValue([unit]);
   mockListSuppliers.mockResolvedValue([supplier]);
@@ -311,5 +318,15 @@ describe('InventoryDetailScreen', () => {
     // The stable code is localized; an owner-typed reason renders verbatim.
     expect(getByText('Ajuste manual')).toBeTruthy();
     expect(getByText('Conteo físico')).toBeTruthy();
+  });
+
+  it('hides the stock adjustment form without inventory.manage', async () => {
+    mockUseCan.mockReturnValue(false);
+
+    const { queryByText, getByText } = await render(<InventoryDetailScreen />);
+
+    await waitFor(() => expect(getByText('Movimientos recientes')).toBeTruthy());
+    expect(queryByText('Ajustar existencia')).toBeNull();
+    expect(queryByText('Guardar existencia')).toBeNull();
   });
 });

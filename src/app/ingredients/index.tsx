@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { useCan } from '@/auth';
+
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
@@ -25,6 +27,7 @@ import { formatQuantityMilli } from '@/lib/catalog-form';
 export default function IngredientsScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const canManage = useCan('catalog.manage');
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -83,7 +86,7 @@ export default function IngredientsScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerShadowVisible: false,
-          headerRight: renderAdd,
+          headerRight: canManage ? renderAdd : undefined,
         }}
       />
 
@@ -121,8 +124,12 @@ export default function IngredientsScreen() {
             icon="package-variant-closed"
             title={t('ingredients.emptyTitle')}
             message={t('ingredients.emptyMessage')}
-            actionLabel={t('ingredients.emptyAction')}
-            onActionPress={() => router.push('/ingredients/edit')}
+            {...(canManage
+              ? {
+                  actionLabel: t('ingredients.emptyAction'),
+                  onActionPress: () => router.push('/ingredients/edit'),
+                }
+              : {})}
           />
         </View>
       ) : visible.length === 0 ? (
@@ -140,6 +147,7 @@ export default function IngredientsScreen() {
               ) : null}
               <Pressable
                 accessibilityRole="button"
+                disabled={!canManage}
                 onPress={() => router.push({ pathname: '/ingredients/edit', params: { id: item.id } })}
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
                 <MaterialCommunityIcons

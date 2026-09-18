@@ -268,6 +268,7 @@ export {
   HELD_SALE_TTL_HOURS,
   listSales,
   refundSale,
+  refundSaleAuthorized,
   removeSaleItem,
   updateSaleItemQuantity,
 } from '@/db/repositories/sale';

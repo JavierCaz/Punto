@@ -25,6 +25,9 @@ import type { BackupDocument } from '@/lib/backup-format';
 
 jest.mock('@/db/client', () => ({ getDb: jest.fn() }));
 
+/** Minimal actor fixture for the authorization asserts. */
+const ADMIN = { role: 'ADMIN' } as const;
+
 // --- node:sqlite capability gate ------------------------------------------
 
 interface SqliteStatement {
@@ -232,17 +235,17 @@ describeSqlite('backup round-trip (real SQLite)', () => {
   it('export → clear → import preserves every row byte-for-byte', async () => {
     const before = snapshot(sqlite);
 
-    const exported = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
+    const exported = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
     const json = serializeBackup(exported);
 
     expect(await isDatabaseEmpty()).toBe(false);
-    await clearAllData();
+    await clearAllData(ADMIN);
     expect(await isDatabaseEmpty()).toBe(true);
     expect(snapshot(sqlite)).toEqual(
       Object.fromEntries(BACKUP_TABLES.map((table) => [table, []])),
     );
 
-    await importDatabase(JSON.parse(json), { mode: 'replace' });
+    await importDatabase(ADMIN, JSON.parse(json), { mode: 'replace' });
 
     const after = snapshot(sqlite);
     expect(after).toEqual(before);
@@ -255,19 +258,19 @@ describeSqlite('backup round-trip (real SQLite)', () => {
   });
 
   it('serializes deterministically for the same data', async () => {
-    const first = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
-    const second = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
+    const first = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
+    const second = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
     expect(serializeBackup(second)).toBe(serializeBackup(first));
   });
 
   it('rolls back completely when a file has a dangling foreign key', async () => {
     const before = snapshot(sqlite);
-    const exported = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
+    const exported = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
 
     const tampered = clone(exported) as BackupDocument;
     tampered.tables.unit = [];
 
-    const error = await importDatabase(tampered, { mode: 'replace' }).catch((e: unknown) => e);
+    const error = await importDatabase(ADMIN, tampered, { mode: 'replace' }).catch((e: unknown) => e);
 
     expect(isRepoError(error, REPO_ERROR.BACKUP_INVALID)).toBe(true);
     expect(snapshot(sqlite)).toEqual(before);
@@ -275,20 +278,20 @@ describeSqlite('backup round-trip (real SQLite)', () => {
 
   it('refuses to import over existing data unless replace is requested', async () => {
     const before = snapshot(sqlite);
-    const exported = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
+    const exported = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
 
-    const error = await importDatabase(exported).catch((e: unknown) => e);
+    const error = await importDatabase(ADMIN, exported).catch((e: unknown) => e);
 
     expect(isRepoError(error, REPO_ERROR.BACKUP_CONFLICT)).toBe(true);
     expect(snapshot(sqlite)).toEqual(before);
   });
 
   it('rejects a document from a different schema version', async () => {
-    const exported = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
+    const exported = await exportDatabase(ADMIN, { exportedAt: '2026-09-17T12:00:00.000Z' });
     const tampered = clone(exported) as BackupDocument;
     tampered.schemaVersion = 99;
 
-    const error = await importDatabase(tampered, { mode: 'replace' }).catch((e: unknown) => e);
+    const error = await importDatabase(ADMIN, tampered, { mode: 'replace' }).catch((e: unknown) => e);
 
     expect(isRepoError(error, REPO_ERROR.BACKUP_INVALID)).toBe(true);
   });

@@ -3,7 +3,8 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { listActiveEmployees, useAuthStore } from '@/auth';
+import { listActiveEmployees, useAuthStore, useCan } from '@/auth';
+import { ManagerPinSheet } from '@/components/manager-pin-sheet';
 import { PrimaryButton } from '@/components/primary-button';
 import { ReceiptView } from '@/components/receipt-view';
 import { Screen } from '@/components/screen';
@@ -17,6 +18,7 @@ import {
   getSaleById,
   listPaymentMethods,
   refundSale,
+  refundSaleAuthorized,
   type PaymentMethod,
   type SaleDetail,
 } from '@/db';
@@ -34,6 +36,7 @@ export default function ReceiptScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useAuthStore((state) => state.user);
+  const canRefundDirectly = useCan('sales.refund');
 
   const [sale, setSale] = useState<SaleDetail | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -43,6 +46,8 @@ export default function ReceiptScreen() {
   const [employeeName, setEmployeeName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refunding, setRefunding] = useState(false);
+  const [pinSheetVisible, setPinSheetVisible] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -77,14 +82,25 @@ export default function ReceiptScreen() {
     }, [load]),
   );
 
-  const handleRefund = useCallback(
-    async (restoreInventory: boolean) => {
+  const performRefund = useCallback(
+    async (restoreInventory: boolean, authorizingAdminId: string | null) => {
       if (!sale) {
         return;
       }
       setRefunding(true);
       try {
-        await refundSale(sale.id, { employeeId: user?.id, restoreInventory });
+        if (authorizingAdminId) {
+          await refundSaleAuthorized(authorizingAdminId, sale.id, {
+            employeeId: user?.id,
+            restoreInventory,
+          });
+        } else {
+          await refundSale(user, sale.id, {
+            employeeId: user?.id,
+            authorizedById: user?.id,
+            restoreInventory,
+          });
+        }
         await load();
       } catch {
         showMessage({
@@ -113,7 +129,14 @@ export default function ReceiptScreen() {
         value: false,
         testID: 'refund-restore-inventory',
       },
-      onConfirm: (restoreInventory) => void handleRefund(restoreInventory),
+      onConfirm: (restoreInventory) => {
+        if (canRefundDirectly) {
+          void performRefund(restoreInventory, null);
+        } else {
+          setPendingRestore(restoreInventory);
+          setPinSheetVisible(true);
+        }
+      },
     });
   };
 
@@ -205,11 +228,13 @@ export default function ReceiptScreen() {
 
           {sale.status === 'HELD' ? (
             <View style={styles.actions}>
-              <SecondaryButton
-                label={t('pos.cart.discard')}
-                onPress={handleCancelHeld}
-                style={styles.action}
-              />
+              {canRefundDirectly ? (
+                <SecondaryButton
+                  label={t('pos.cart.discard')}
+                  onPress={handleCancelHeld}
+                  style={styles.action}
+                />
+              ) : null}
               <PrimaryButton
                 label={t('pos.held.resume')}
                 icon="cart-arrow-right"
@@ -220,6 +245,14 @@ export default function ReceiptScreen() {
           ) : null}
         </>
       )}
+      <ManagerPinSheet
+        visible={pinSheetVisible}
+        onClose={() => setPinSheetVisible(false)}
+        onAuthorized={(adminId) => {
+          setPinSheetVisible(false);
+          void performRefund(pendingRestore, adminId);
+        }}
+      />
     </Screen>
   );
 }

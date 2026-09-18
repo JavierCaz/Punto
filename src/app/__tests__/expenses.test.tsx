@@ -24,6 +24,10 @@ import {
 import { i18n } from '@/i18n';
 import { formatMoney } from '@/i18n/format';
 
+// Admin session: the create affordances are visible (employee gating is
+// covered by the permissions unit tests).
+jest.mock('@/auth', () => ({ useCan: () => true }));
+
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 

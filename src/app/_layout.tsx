@@ -10,7 +10,7 @@ import { View } from 'react-native';
 import '@/global.css';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { useAuthStore } from '@/auth';
+import { can, useAuthStore } from '@/auth';
 import { getBusinessProfile, getDb } from '@/db';
 import { DialogHost } from '@/dialog';
 import { useDbBootstrap } from '@/hooks/use-db-bootstrap';
@@ -43,6 +43,7 @@ export default function RootLayout() {
   const hasThemeHydrated = useThemeStore((state) => state.hasHydrated);
   const hasAccentHydrated = useAccentStore((state) => state.hasHydrated);
   const authPhase = useAuthStore((state) => state.phase);
+  const user = useAuthStore((state) => state.user);
   const authHydrated = useAuthStore((state) => state.hasHydrated);
   const [hasLanguageHydrated, setHasLanguageHydrated] = useState(false);
   const scheme = useEffectiveColorScheme();
@@ -149,9 +150,6 @@ export default function RootLayout() {
 
             <Stack.Protected guard={authPhase === 'ready'}>
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="settings" />
-              <Stack.Screen name="backup" />
-              <Stack.Screen name="team" />
               <Stack.Screen name="products" />
               <Stack.Screen name="categories" />
               <Stack.Screen name="ingredients" />
@@ -160,6 +158,18 @@ export default function RootLayout() {
               <Stack.Screen name="purchases" />
               <Stack.Screen name="expenses" />
               <Stack.Screen name="receipt" options={{ presentation: 'modal' }} />
+            </Stack.Protected>
+
+            {/* Admin-only: Settings + Data (backup). Employees never mount these. */}
+            <Stack.Protected guard={authPhase === 'ready' && can(user, 'settings.manage')}>
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="backup" />
+              <Stack.Screen name="manager-pin" />
+            </Stack.Protected>
+
+            {/* Admin-only: team management. */}
+            <Stack.Protected guard={authPhase === 'ready' && can(user, 'team.manage')}>
+              <Stack.Screen name="team" />
             </Stack.Protected>
           </Stack>
         ) : null}

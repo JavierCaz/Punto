@@ -20,12 +20,30 @@ export {
   onboardBusiness,
   resolveAuthKind,
   signIn,
+  hasAuthorizationPin,
+  setAuthorizationPin,
+  verifyManagerAuthorizationPin,
 } from '@/auth/auth-repository';
-export type { PublicEmployee, UpdateEmployeeInput } from '@/auth/auth-repository';
-export { loginLimiter } from '@/auth/lockout';
+export type { ManagerPinResult, PublicEmployee, UpdateEmployeeInput } from '@/auth/auth-repository';
+export { loginLimiter, managerPinLimiter, MANAGER_PIN_LIMITER_KEY } from '@/auth/lockout';
 export {
   normalizeUsername,
   validatePassword,
   validatePin,
   validateUsername,
 } from '@/auth/validation';
+
+
+// Role → capability authorization (RBAC). Repositories import from
+// '@/auth/permissions' directly to avoid pulling this barrel into '@/db'.
+export {
+  AUTH_FORBIDDEN,
+  CAPABILITIES,
+  ForbiddenError,
+  ROLE_CAPABILITIES,
+  can,
+  isForbiddenError,
+  requireCapability,
+} from '@/auth/permissions';
+export type { AuthActor, Capability } from '@/auth/permissions';
+export { useCan } from '@/auth/use-can';

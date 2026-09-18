@@ -1,14 +1,16 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import ReceiptScreen from '@/app/receipt/[id]';
-import { refundSale, getSaleById, listPaymentMethods } from '@/db';
+import { refundSale, refundSaleAuthorized, getSaleById, listPaymentMethods } from '@/db';
 import type { PaymentMethod, SaleDetail } from '@/db';
+import { verifyManagerAuthorizationPin } from '@/auth';
 import { i18n } from '@/i18n';
 import { useCartStore } from '@/pos/cart-store';
 import { DialogHost, dismissDialog } from '@/dialog';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+const mockUseCan = jest.fn(() => true);
 
 jest.mock('expo-router', () => ({
   router: {
@@ -37,6 +39,7 @@ jest.mock('@/db', () => ({
   getBusinessProfile: jest.fn(),
   listPaymentMethods: jest.fn(),
   refundSale: jest.fn(),
+  refundSaleAuthorized: jest.fn(),
 }));
 
 jest.mock('@/auth', () => ({
@@ -45,6 +48,9 @@ jest.mock('@/auth', () => ({
   ]),
   useAuthStore: (selector: (state: unknown) => unknown) =>
     selector({ user: { id: 'emp-1', firstName: 'Ana', lastName: null, role: 'ADMIN' } }),
+  useCan: () => mockUseCan(),
+  validatePin: jest.fn(() => null),
+  verifyManagerAuthorizationPin: jest.fn(async () => ({ ok: true, adminId: 'admin-1' })),
 }));
 
 jest.mock('expo-localization', () => ({
@@ -132,9 +138,16 @@ const completedSale: SaleDetail = {
 const mockGetSaleById = getSaleById as jest.MockedFunction<typeof getSaleById>;
 const mockListPaymentMethods = listPaymentMethods as jest.MockedFunction<typeof listPaymentMethods>;
 const mockRefundSale = refundSale as jest.MockedFunction<typeof refundSale>;
+const mockRefundSaleAuthorized = refundSaleAuthorized as jest.MockedFunction<
+  typeof refundSaleAuthorized
+>;
+const mockVerifyManagerPin = verifyManagerAuthorizationPin as jest.MockedFunction<
+  typeof verifyManagerAuthorizationPin
+>;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseCan.mockReturnValue(true);
   dismissDialog();
   useCartStore.getState().reset();
   mockListPaymentMethods.mockResolvedValue([cash]);
@@ -166,10 +179,11 @@ describe('ReceiptScreen', () => {
     await fireEvent.press(getByTestId('app-dialog-confirm'));
 
     await waitFor(() =>
-      expect(mockRefundSale).toHaveBeenCalledWith('sale-1', {
-        employeeId: 'emp-1',
-        restoreInventory: false,
-      }),
+      expect(mockRefundSale).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'emp-1' }),
+        'sale-1',
+        expect.objectContaining({ employeeId: 'emp-1', restoreInventory: false }),
+      ),
     );
   });
 
@@ -189,10 +203,11 @@ describe('ReceiptScreen', () => {
     await fireEvent.press(getByTestId('app-dialog-confirm'));
 
     await waitFor(() =>
-      expect(mockRefundSale).toHaveBeenCalledWith('sale-1', {
-        employeeId: 'emp-1',
-        restoreInventory: true,
-      }),
+      expect(mockRefundSale).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'emp-1' }),
+        'sale-1',
+        expect.objectContaining({ employeeId: 'emp-1', restoreInventory: true }),
+      ),
     );
   });
 
@@ -206,5 +221,56 @@ describe('ReceiptScreen', () => {
 
     await waitFor(() => expect(useCartStore.getState().saleId).toBe('sale-1'));
     expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+
+  it('lets an employee initiate a refund and requires a manager PIN', async () => {
+    mockUseCan.mockReturnValue(false);
+
+    const { getByText, getByTestId } = await render(
+      <>
+        <ReceiptScreen />
+        <DialogHost />
+      </>,
+    );
+
+    await waitFor(() => expect(getByText('Matcha Latte')).toBeTruthy());
+
+    // The refund button is available to employees...
+    await fireEvent.press(getByText('Reembolsar venta'));
+    await waitFor(() => expect(getByText('¿Reembolsar esta venta?')).toBeTruthy());
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
+
+    // ...but the refund only proceeds through the manager PIN sheet.
+    await waitFor(() => expect(getByTestId('manager-pin-sheet')).toBeTruthy());
+    expect(mockRefundSale).not.toHaveBeenCalled();
+    expect(mockRefundSaleAuthorized).not.toHaveBeenCalled();
+  });
+
+  it('performs an authorized refund after a valid manager PIN', async () => {
+    mockUseCan.mockReturnValue(false);
+    mockVerifyManagerPin.mockResolvedValue({ ok: true, adminId: 'admin-1' });
+
+    const { getByText, getByTestId } = await render(
+      <>
+        <ReceiptScreen />
+        <DialogHost />
+      </>,
+    );
+
+    await waitFor(() => expect(getByText('Matcha Latte')).toBeTruthy());
+    await fireEvent.press(getByText('Reembolsar venta'));
+    await waitFor(() => expect(getByText('¿Reembolsar esta venta?')).toBeTruthy());
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
+
+    await waitFor(() => expect(getByTestId('manager-pin-input')).toBeTruthy());
+    await fireEvent.changeText(getByTestId('manager-pin-input'), '1234');
+    await fireEvent.press(getByTestId('manager-pin-submit'));
+
+    await waitFor(() =>
+      expect(mockRefundSaleAuthorized).toHaveBeenCalledWith('admin-1', 'sale-1', {
+        employeeId: 'emp-1',
+        restoreInventory: false,
+      }),
+    );
   });
 });

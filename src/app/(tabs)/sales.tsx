@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { listActiveEmployees, type PublicEmployee } from '@/auth';
+import { listActiveEmployees, useCan, type PublicEmployee } from '@/auth';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -81,11 +81,13 @@ function FilterChip({
 export default function SalesScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  // Employees are limited to recent history (Today / 7 days); full range is admin-only.
+  const canViewAllSales = useCan('sales.viewAll');
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<SaleStatus | null>(null);
-  const [dateFilter, setDateFilter] = useState<DateRangeFilter>('all');
+  const [dateFilter, setDateFilter] = useState<DateRangeFilter>(canViewAllSales ? 'all' : 'today');
   const [methodId, setMethodId] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -300,7 +302,7 @@ export default function SalesScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.filters}
         contentContainerStyle={styles.filtersContent}>
-        {DATE_FILTERS.map((entry) => (
+        {(canViewAllSales ? DATE_FILTERS : DATE_FILTERS.filter((entry) => entry.key === 'today' || entry.key === 'last7')).map((entry) => (
           <FilterChip
             key={entry.key}
             label={t(entry.labelKey)}

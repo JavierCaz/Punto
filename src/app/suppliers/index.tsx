@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { useCan } from '@/auth';
 import { EmptyState } from '@/components/empty-state';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -23,6 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 export default function SuppliersScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const canManage = useCan('operations.manage');
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,7 @@ export default function SuppliersScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerShadowVisible: false,
-          headerRight: renderAdd,
+          headerRight: canManage ? renderAdd : undefined,
         }}
       />
 
@@ -120,8 +122,12 @@ export default function SuppliersScreen() {
             icon="truck-outline"
             title={t('suppliers.emptyTitle')}
             message={t('suppliers.emptyMessage')}
-            actionLabel={t('suppliers.emptyAction')}
-            onActionPress={() => router.push('/suppliers/edit')}
+            {...(canManage
+              ? {
+                  actionLabel: t('suppliers.emptyAction'),
+                  onActionPress: () => router.push('/suppliers/edit'),
+                }
+              : {})}
           />
         </View>
       ) : visible.length === 0 ? (
@@ -141,6 +147,7 @@ export default function SuppliersScreen() {
                 ) : null}
                 <Pressable
                   accessibilityRole="button"
+                  disabled={!canManage}
                   onPress={() => router.push({ pathname: '/suppliers/edit', params: { id: supplier.id } })}
                   style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
                   <MaterialCommunityIcons name="truck-outline" size={22} color={theme.textSecondary} />

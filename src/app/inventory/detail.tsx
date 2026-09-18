@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { useCan } from '@/auth';
 import { FormField } from '@/components/form-field';
 import { PrimaryButton } from '@/components/primary-button';
 import { Screen } from '@/components/screen';
@@ -64,6 +65,7 @@ export default function InventoryDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const rawId = params.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
+  const canAdjust = useCan('inventory.manage');
 
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [unit, setUnit] = useState<Unit | null>(null);
@@ -302,46 +304,48 @@ export default function InventoryDetailScreen() {
             )}
           </View>
 
-          <View style={styles.section}>
-            <ThemedText type="heading2">{t('inventory.detail.adjustTitle')}</ThemedText>
-            <FormField
-              label={t('inventory.detail.adjustLabel')}
-              accessibilityLabel={t('inventory.detail.adjustLabel')}
-              placeholder={formatQuantityMilli(item.currentQuantity)}
-              value={adjustInput}
-              onChangeText={(value) => {
-                setAdjustInput(value);
-                setAdjustError(null);
-                setAdjustSaved(false);
-              }}
-              hint={t('inventory.detail.adjustHint')}
-              error={adjustError ?? undefined}
-              keyboardType="decimal-pad"
-              testID="inventory-adjust-input"
-            />
-            <FormField
-              label={t('inventory.detail.adjustReasonLabel')}
-              accessibilityLabel={t('inventory.detail.adjustReasonLabel')}
-              placeholder={t('inventory.detail.adjustReasonPlaceholder')}
-              value={adjustReason}
-              onChangeText={(value) => {
-                setAdjustReason(value);
-                setAdjustSaved(false);
-              }}
-              hint={t('inventory.detail.adjustReasonHint')}
-              testID="inventory-adjust-reason"
-            />
-            {adjustSaved ? (
-              <ThemedText type="body2" themeColor="success">
-                {t('inventory.detail.adjustSaved')}
-              </ThemedText>
-            ) : null}
-            <PrimaryButton
-              label={t('inventory.detail.adjustSave')}
-              onPress={() => void handleAdjust()}
-              disabled={adjusting}
-            />
-          </View>
+          {canAdjust ? (
+            <View style={styles.section}>
+              <ThemedText type="heading2">{t('inventory.detail.adjustTitle')}</ThemedText>
+              <FormField
+                label={t('inventory.detail.adjustLabel')}
+                accessibilityLabel={t('inventory.detail.adjustLabel')}
+                placeholder={formatQuantityMilli(item.currentQuantity)}
+                value={adjustInput}
+                onChangeText={(value) => {
+                  setAdjustInput(value);
+                  setAdjustError(null);
+                  setAdjustSaved(false);
+                }}
+                hint={t('inventory.detail.adjustHint')}
+                error={adjustError ?? undefined}
+                keyboardType="decimal-pad"
+                testID="inventory-adjust-input"
+              />
+              <FormField
+                label={t('inventory.detail.adjustReasonLabel')}
+                accessibilityLabel={t('inventory.detail.adjustReasonLabel')}
+                placeholder={t('inventory.detail.adjustReasonPlaceholder')}
+                value={adjustReason}
+                onChangeText={(value) => {
+                  setAdjustReason(value);
+                  setAdjustSaved(false);
+                }}
+                hint={t('inventory.detail.adjustReasonHint')}
+                testID="inventory-adjust-reason"
+              />
+              {adjustSaved ? (
+                <ThemedText type="body2" themeColor="success">
+                  {t('inventory.detail.adjustSaved')}
+                </ThemedText>
+              ) : null}
+              <PrimaryButton
+                label={t('inventory.detail.adjustSave')}
+                onPress={() => void handleAdjust()}
+                disabled={adjusting}
+              />
+            </View>
+          ) : null}
         </>
       )}
     </Screen>

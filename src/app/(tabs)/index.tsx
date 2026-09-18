@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router, useFocusEffect } from 'expo-router';
+import { Redirect, router, useFocusEffect } from 'expo-router';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -126,6 +126,12 @@ export default function DashboardScreen() {
       void reload();
     }, [reload]),
   );
+
+  // The dashboard is business-wide financial data — ADMIN only. Employees are
+  // redirected to POS even if they deep-link onto this route.
+  if (!isAdmin) {
+    return <Redirect href="/pos" />;
+  }
 
   if (loading && model === null) {
     return (

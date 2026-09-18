@@ -9,7 +9,14 @@
 
 import { getDb } from '@/db/client';
 
-import { updateEmployee } from '@/auth/auth-repository';
+import {
+  hasAuthorizationPin,
+  setAuthorizationPin,
+  updateEmployee,
+  verifyManagerAuthorizationPin,
+} from '@/auth/auth-repository';
+import { DEFAULT_LOCKOUT, MANAGER_PIN_LIMITER_KEY, managerPinLimiter } from '@/auth/lockout';
+import { verifySecret } from '@/lib/hash';
 import { resetBusinessIdForTesting } from '@/db/repositories/business-scope';
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
@@ -158,5 +165,115 @@ describe('updateEmployee', () => {
     expect(result.lastName).toBeNull();
     const update = adapter.calls.find((call) => call.sql.includes('UPDATE employee SET'));
     expect(update?.params).toContain(null);
+  });
+});
+
+/** A complete SessionUser for the authorization-PIN tests. */
+const ADMIN_SESSION = {
+  id: 'emp-1',
+  businessId: 'biz-1',
+  firstName: 'Ana',
+  lastName: null,
+  username: 'ana',
+  role: 'ADMIN',
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+} as const;
+
+describe('manager authorization PIN', () => {
+  let adapter: RecordingAdapter;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    adapter = new RecordingAdapter();
+    (getDb as jest.Mock).mockResolvedValue(makeFakeDb(adapter));
+    resetBusinessIdForTesting();
+    managerPinLimiter.clear();
+    jest.mocked(verifySecret).mockResolvedValue(true);
+  });
+
+  it('reports no-pin-configured when no admin has an authorization PIN', async () => {
+    adapter.queueAll('FROM employee', []);
+
+    await expect(verifyManagerAuthorizationPin('1234')).resolves.toEqual({
+      ok: false,
+      code: 'no-pin-configured',
+    });
+  });
+
+  it('returns the matching admin id', async () => {
+    adapter.queueAll('FROM employee', [{ id: 'emp-1', authorization_pin_hash: 'hash' }]);
+
+    await expect(verifyManagerAuthorizationPin('1234')).resolves.toEqual({
+      ok: true,
+      adminId: 'emp-1',
+    });
+  });
+
+  it('scans every admin even after a match (no timing oracle)', async () => {
+    adapter.queueAll('FROM employee', [
+      { id: 'emp-1', authorization_pin_hash: 'hash-1' },
+      { id: 'emp-2', authorization_pin_hash: 'hash-2' },
+    ]);
+
+    await expect(verifyManagerAuthorizationPin('1234')).resolves.toEqual({
+      ok: true,
+      adminId: 'emp-1',
+    });
+    expect(verifySecret).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports invalid and records a failure when no admin matches', async () => {
+    adapter.queueAll('FROM employee', [{ id: 'emp-1', authorization_pin_hash: 'hash' }]);
+    jest.mocked(verifySecret).mockResolvedValue(false);
+
+    await expect(verifyManagerAuthorizationPin('0000')).resolves.toEqual({
+      ok: false,
+      code: 'invalid',
+    });
+    expect(managerPinLimiter.isLocked(MANAGER_PIN_LIMITER_KEY)).toBe(false);
+  });
+
+  it('locks after repeated failures', async () => {
+    for (let i = 0; i < DEFAULT_LOCKOUT.maxAttempts; i++) {
+      adapter.queueAll('FROM employee', [{ id: 'emp-1', authorization_pin_hash: 'hash' }]);
+    }
+    jest.mocked(verifySecret).mockResolvedValue(false);
+
+    for (let i = 0; i < DEFAULT_LOCKOUT.maxAttempts; i++) {
+      await verifyManagerAuthorizationPin('0000');
+    }
+    const result = await verifyManagerAuthorizationPin('0000');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('locked');
+    }
+  });
+
+  it('setAuthorizationPin rejects a non-admin actor without writing', async () => {
+    await expect(
+      setAuthorizationPin({ ...ADMIN_SESSION, role: 'EMPLOYEE' }, 'hash'),
+    ).rejects.toMatchObject({ code: 'AUTH_FORBIDDEN' });
+    expect(
+      adapter.calls.some((call) => call.sql.includes('UPDATE employee SET authorization_pin_hash')),
+    ).toBe(false);
+  });
+
+  it('setAuthorizationPin updates the admin row', async () => {
+    await setAuthorizationPin(ADMIN_SESSION, 'hash');
+
+    const update = adapter.calls.find((call) =>
+      call.sql.includes('UPDATE employee SET authorization_pin_hash'),
+    );
+    expect(update?.params).toContain('hash');
+    expect(update?.params).toContain('emp-1');
+  });
+
+  it('hasAuthorizationPin reflects the stored column', async () => {
+    adapter.queueFirst('FROM employee', { authorization_pin_hash: 'hash' });
+    await expect(hasAuthorizationPin('emp-1')).resolves.toBe(true);
+
+    adapter.queueFirst('FROM employee', { authorization_pin_hash: null });
+    await expect(hasAuthorizationPin('emp-1')).resolves.toBe(false);
   });
 });
