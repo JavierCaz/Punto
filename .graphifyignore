@@ -1,0 +1,44 @@
+# .graphifyignore — patterns graphify skips when building the knowledge graph.
+#
+# Syntax is identical to .gitignore, including `!` negation. graphify reads the
+# .gitignore in each directory automatically; when a .graphifyignore is present
+# the two are merged and .graphifyignore patterns are evaluated LAST, so they
+# win on conflict. A .graphifyignore can only ever exclude MORE — a `!` here
+# cannot re-include a file that .gitignore already excluded. Scoping is
+# per-directory, exactly like git: this file governs the repo root and below.
+
+# --- graphify's own outputs (never graph the graph) ------------------------
+# graph.json alone is ~3 MB; re-running `graphify update` would ingest its own
+# output without this.
+graphify-out/
+
+# --- lockfile: generated dependency data, no product meaning ---------------
+# package.json is the source of truth we actually want to see.
+package-lock.json
+
+# --- agent / tooling config — not product code -----------------------------
+.claude/
+.opencode/
+.vscode/
+
+# --- Expo / React starter-kit artwork with zero product references ---------
+# Confirmed unused: 0 references in src/, app.json or app.config.ts.
+assets/images/react-logo*.png
+assets/images/tutorial-web.png
+assets/images/tabIcons/
+
+# Ignore the Expo template artwork as a group...
+assets/images/expo-*
+# ...but keep the Expo logo. The live animated splash still requires it from
+# src/components/animated-icon.tsx and animated-icon.web.tsx, so the graph
+# should keep that dependency edge.
+!assets/images/expo-logo.png
+
+# --- Deliberately KEPT — do not ignore -------------------------------------
+# Punto brand assets are referenced by app.json / src and carry real meaning:
+#   assets/images/icon.png              app.json  icon
+#   assets/images/splash-icon.png       app.json  splash
+#   assets/images/favicon.png           app.json  web favicon
+#   assets/images/logo-glow.png         animated-icon splash glow
+#   assets/images/android-icon-*.png    adaptive icon layers
+#   assets/expo.icon/                   icon-composer source
