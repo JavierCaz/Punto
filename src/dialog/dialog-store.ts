@@ -25,7 +25,18 @@ export type MessageDialogOptions = {
   closeLabel?: string;
 };
 
-/** Two-action confirmation dialog (cancel + confirm). */
+/** Optional inline toggle rendered inside a confirmation dialog. */
+export type ConfirmDialogToggle = {
+  /** Label shown next to the switch. */
+  label: string;
+  /** Optional supporting line under the label. */
+  hint?: string;
+  /** Initial switch state. Defaults to `false`. */
+  value?: boolean;
+  testID?: string;
+};
+
+/** Two-action confirmation dialog (cancel + confirm), with an optional toggle. */
 export type ConfirmDialogOptions = {
   title: string;
   message?: string;
@@ -36,7 +47,12 @@ export type ConfirmDialogOptions = {
   cancelLabel?: string;
   /** Emphasis of the confirm button. Use 'danger' for destructive actions. */
   confirmTone?: 'primary' | 'danger';
-  onConfirm: () => void;
+  /**
+   * Optional switch shown above the actions. Its live value is passed to
+   * `onConfirm`; when absent, `onConfirm` receives `false`.
+   */
+  toggle?: ConfirmDialogToggle;
+  onConfirm: (toggleValue: boolean) => void;
   onCancel?: () => void;
 };
 
@@ -46,13 +62,23 @@ export type DialogRequest =
 
 type DialogStoreState = {
   dialog: DialogRequest | null;
+  /** Live value of the active confirm dialog's toggle (`false` when none). */
+  toggleValue: boolean;
   open: (request: DialogRequest) => void;
+  setToggleValue: (value: boolean) => void;
   close: () => void;
 };
 
 export const useDialogStore = create<DialogStoreState>()((set) => ({
   dialog: null,
-  open: (dialog) => set({ dialog }),
+  toggleValue: false,
+  open: (request) =>
+    set({
+      dialog: request,
+      toggleValue:
+        request.kind === 'confirm' ? (request.options.toggle?.value ?? false) : false,
+    }),
+  setToggleValue: (toggleValue) => set({ toggleValue }),
   close: () => set({ dialog: null }),
 }));
 

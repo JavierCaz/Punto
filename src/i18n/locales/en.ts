@@ -207,10 +207,15 @@ const en: typeof es = {
       loadFailed: "We couldn't load the receipt.",
       refund: 'Refund sale',
       refundConfirmTitle: 'Refund this sale?',
-      refundConfirmMessage: 'Sold stock will be returned to inventory. This cannot be undone.',
+      refundConfirmMessage:
+        'Choose whether the sold stock should return to inventory. This cannot be undone.',
+      refundRestoreInventory: 'Return stock to inventory',
+      refundRestoreInventoryHint:
+        'Turn this on only if the products or ingredients can be sold again.',
       refundDone: 'Sale refunded',
       refundFailed: "We couldn't refund the sale.",
       refundedBanner: 'This sale was refunded',
+      refundedNoRestockBanner: 'This sale was refunded without returning stock',
       cancelledBanner: 'This sale was cancelled',
       heldBanner: 'This sale is on hold',
     },

@@ -125,6 +125,7 @@ const completedSale: SaleDetail = {
   completedAt: '2026-01-01T00:00:00.000Z',
   cancelledAt: null,
   refundedAt: null,
+  inventoryRestored: null,
   items: [
     {
       id: 'si-1',
@@ -170,6 +171,7 @@ const heldSale: Sale = {
   completedAt: null,
   cancelledAt: null,
   refundedAt: null,
+  inventoryRestored: null,
 };
 
 const heldDetail: SaleDetail = { ...heldSale, items: completedSale.items, payments: [] };

@@ -77,24 +77,27 @@ export default function ReceiptScreen() {
     }, [load]),
   );
 
-  const handleRefund = useCallback(async () => {
-    if (!sale) {
-      return;
-    }
-    setRefunding(true);
-    try {
-      await refundSale(sale.id, { employeeId: user?.id });
-      await load();
-    } catch {
-      showMessage({
-        title: t('common.status.error'),
-        message: t('pos.receipt.refundFailed'),
-        tone: 'danger',
-      });
-    } finally {
-      setRefunding(false);
-    }
-  }, [sale, user, load, t]);
+  const handleRefund = useCallback(
+    async (restoreInventory: boolean) => {
+      if (!sale) {
+        return;
+      }
+      setRefunding(true);
+      try {
+        await refundSale(sale.id, { employeeId: user?.id, restoreInventory });
+        await load();
+      } catch {
+        showMessage({
+          title: t('common.status.error'),
+          message: t('pos.receipt.refundFailed'),
+          tone: 'danger',
+        });
+      } finally {
+        setRefunding(false);
+      }
+    },
+    [sale, user, load, t],
+  );
 
   const confirmRefund = (): void => {
     showConfirm({
@@ -103,7 +106,14 @@ export default function ReceiptScreen() {
       tone: 'danger',
       confirmLabel: t('pos.receipt.refund'),
       confirmTone: 'danger',
-      onConfirm: () => void handleRefund(),
+      toggle: {
+        label: t('pos.receipt.refundRestoreInventory'),
+        hint: t('pos.receipt.refundRestoreInventoryHint'),
+        // Default OFF: returned ingredients are often no longer sellable.
+        value: false,
+        testID: 'refund-restore-inventory',
+      },
+      onConfirm: (restoreInventory) => void handleRefund(restoreInventory),
     });
   };
 

@@ -81,6 +81,7 @@ const baseSale: SaleDetail = {
   completedAt: CREATED_AT,
   cancelledAt: null,
   refundedAt: null,
+  inventoryRestored: null,
   items: [
     {
       id: 'item-1',
@@ -202,11 +203,23 @@ describe('ReceiptView', () => {
       ...baseSale,
       status: 'REFUNDED',
       refundedAt: CREATED_AT,
+      inventoryRestored: null,
     });
 
     expect(getByText('Esta venta fue reembolsada')).toBeTruthy();
     expect(getByText('Reembolsada')).toBeTruthy();
     expect(getByTestId('receipt-status-banner')).toBeTruthy();
+  });
+
+  it('shows the no-restock banner for a refunded sale that skipped inventory', async () => {
+    const { getByText } = await renderReceipt({
+      ...baseSale,
+      status: 'REFUNDED',
+      refundedAt: CREATED_AT,
+      inventoryRestored: false,
+    });
+
+    expect(getByText('Esta venta fue reembolsada sin devolver el inventario')).toBeTruthy();
   });
 
   it('does not show a banner for a completed sale', async () => {

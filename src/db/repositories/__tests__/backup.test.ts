@@ -18,6 +18,7 @@ import {
   isDatabaseEmpty,
 } from '@/db/repositories/backup';
 import { REPO_ERROR, isRepoError } from '@/db/repositories/errors';
+import { LATEST_SCHEMA_VERSION } from '@/db/migrations';
 import { makeFakeDb } from '@/db/repositories/__tests__/fakes/fake-db';
 import { RecordingAdapter } from '@/db/repositories/__tests__/fakes/recording-adapter';
 import { BACKUP_DELETE_ORDER, BACKUP_TABLES, buildBackupDocument, emptyBackupTables } from '@/lib/backup-format';
@@ -64,7 +65,7 @@ function makeImportDoc(productRows: { id: string; description: string | null }[]
   const tables = emptyBackupTables();
   tables.product = productRows;
   return buildBackupDocument({
-    schemaVersion: 2,
+    schemaVersion: LATEST_SCHEMA_VERSION,
     exportedAt: '2026-09-17T12:00:00.000Z',
     tables,
   });
@@ -95,7 +96,7 @@ describe('backup repository', () => {
 
       const doc = await exportDatabase({ exportedAt: '2026-09-17T12:00:00.000Z' });
 
-      expect(doc.schemaVersion).toBe(2);
+      expect(doc.schemaVersion).toBe(LATEST_SCHEMA_VERSION);
       expect(doc.exportedAt).toBe('2026-09-17T12:00:00.000Z');
       expect(doc.tables.business).toEqual([{ id: 'b1' }]);
       // `description` was absent from the SQLite row → normalized to null.

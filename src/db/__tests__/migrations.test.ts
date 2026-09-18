@@ -108,4 +108,11 @@ describe('migration registry', () => {
     expect(sql).toMatch(/CREATE UNIQUE INDEX uq_employee_username/);
     expect(sql).toMatch(/CHECK \(role IN \('ADMIN', 'EMPLOYEE'\)\)/);
   });
+
+  it('adds the refund inventory-restore flag (migration 003)', () => {
+    const sql = migrations.flatMap((m: Migration) => m.up).join('\n');
+
+    expect(sql).toMatch(/ALTER TABLE sale ADD COLUMN inventory_restored INTEGER/);
+    expect(sql).toMatch(/CHECK \(inventory_restored IN \(0, 1\)\)/);
+  });
 });

@@ -99,6 +99,7 @@ const completedSale: SaleDetail = {
   completedAt: '2026-01-01T00:00:00.000Z',
   cancelledAt: null,
   refundedAt: null,
+  inventoryRestored: null,
   items: [
     {
       id: 'si-1',
@@ -165,7 +166,33 @@ describe('ReceiptScreen', () => {
     await fireEvent.press(getByTestId('app-dialog-confirm'));
 
     await waitFor(() =>
-      expect(mockRefundSale).toHaveBeenCalledWith('sale-1', { employeeId: 'emp-1' }),
+      expect(mockRefundSale).toHaveBeenCalledWith('sale-1', {
+        employeeId: 'emp-1',
+        restoreInventory: false,
+      }),
+    );
+  });
+
+  it('passes restoreInventory: true when the user enables the inventory toggle', async () => {
+    const { getByText, getByTestId } = await render(
+      <>
+        <ReceiptScreen />
+        <DialogHost />
+      </>,
+    );
+
+    await waitFor(() => expect(getByText('Matcha Latte')).toBeTruthy());
+    await fireEvent.press(getByText('Reembolsar venta'));
+    await waitFor(() => expect(getByText('¿Reembolsar esta venta?')).toBeTruthy());
+
+    await fireEvent(getByTestId('refund-restore-inventory'), 'valueChange', true);
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
+
+    await waitFor(() =>
+      expect(mockRefundSale).toHaveBeenCalledWith('sale-1', {
+        employeeId: 'emp-1',
+        restoreInventory: true,
+      }),
     );
   });
 

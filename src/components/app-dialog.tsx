@@ -5,6 +5,7 @@ import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import type { MaterialIconName } from './empty-state';
 import { PrimaryButton, type PrimaryButtonTone } from './primary-button';
 import { SecondaryButton } from './secondary-button';
+import { SwitchRow } from './switch-row';
 import { ThemedText } from './themed-text';
 
 import { Radius, Spacing } from '@/constants/theme';
@@ -36,6 +37,12 @@ export type AppDialogProps = {
   onSecondaryPress?: () => void;
   /** Backdrop / Android-back dismissal. Omit to make the dialog non-dismissible. */
   onDismiss?: () => void;
+  /** Optional inline toggle rendered above the actions (e.g. an opt-out). */
+  toggleLabel?: string;
+  toggleHint?: string;
+  toggleValue?: boolean;
+  onToggleChange?: (value: boolean) => void;
+  toggleTestID?: string;
   testID?: string;
 };
 
@@ -57,6 +64,11 @@ export function AppDialog({
   secondaryLabel,
   onSecondaryPress,
   onDismiss,
+  toggleLabel,
+  toggleHint,
+  toggleValue,
+  onToggleChange,
+  toggleTestID,
   testID,
 }: AppDialogProps) {
   const { t } = useTranslation();
@@ -110,6 +122,16 @@ export function AppDialog({
             <ThemedText type="body1" themeColor="textSecondary">
               {message}
             </ThemedText>
+          ) : null}
+
+          {toggleLabel != null ? (
+            <SwitchRow
+              label={toggleLabel}
+              hint={toggleHint}
+              value={toggleValue ?? false}
+              onValueChange={onToggleChange ?? (() => {})}
+              testID={toggleTestID}
+            />
           ) : null}
 
           <View style={styles.actions}>

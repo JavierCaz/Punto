@@ -687,6 +687,11 @@ describe('sale repository', () => {
       const statusCall = adapter.calls.find((c) => c.sql.includes("status = 'REFUNDED'"));
       expect(statusCall).toBeDefined();
       expect(statusCall!.sql).toContain('refunded_at = ?');
+      expect(statusCall!.sql).toContain('inventory_restored = ?');
+      expect(statusCall!.params[0]).toBe(statusCall!.params[1]); // refunded_at === updated_at
+      expect(statusCall!.params[2]).toBe(1); // restoreInventory defaults to true
+      expect(statusCall).toBeDefined();
+      expect(statusCall!.sql).toContain('refunded_at = ?');
       expect(statusCall!.params[0]).toBe(statusCall!.params[1]); // refunded_at === updated_at
     });
 
@@ -698,6 +703,25 @@ describe('sale repository', () => {
       expect(isRepoError(error, REPO_ERROR.INVALID_STATE)).toBe(true);
       expect(adapter.calls.some((c) => c.sql.includes('INSERT INTO inventory_movement'))).toBe(false);
       expect(adapter.calls.some((c) => c.sql.includes('UPDATE sale'))).toBe(false);
+    });
+
+    it('skips the RETURN movements and records inventory_restored = 0 when restoreInventory is false', async () => {
+      adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
+      adapter.queueFirst('FROM sale', { ...SALE_ROW, status: 'COMPLETED', employee_id: 'emp-1' });
+
+      await refundSale('sale-1', { restoreInventory: false });
+
+      // No ledger reads and no RETURN movements: the original SALE stays as the
+      // record of consumption.
+      expect(adapter.calls.some((c) => c.sql.includes('INSERT INTO inventory_movement'))).toBe(false);
+      expect(adapter.calls.some((c) => c.sql.includes('FROM inventory_movement'))).toBe(false);
+
+      const statusCall = adapter.calls.find((c) => c.sql.includes("status = 'REFUNDED'"));
+      expect(statusCall).toBeDefined();
+      expect(statusCall!.sql).toContain('inventory_restored = ?');
+      expect(statusCall!.params[2]).toBe(0);
+      expect(statusCall!.params[3]).toBe('sale-1');
+      expect(statusCall!.params[4]).toBe('biz-1');
     });
   });
 

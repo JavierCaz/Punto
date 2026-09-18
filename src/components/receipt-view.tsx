@@ -39,19 +39,29 @@ const STATUS_LABEL_KEY: Record<SaleDetail['status'], StatusLabelKey> = {
 };
 
 /** Non-completed statuses surface a prominent banner; COMPLETED stays quiet. */
+type BannerKey =
+  | 'pos.receipt.refundedBanner'
+  | 'pos.receipt.refundedNoRestockBanner'
+  | 'pos.receipt.cancelledBanner'
+  | 'pos.receipt.heldBanner';
+
 const STATUS_BANNER: Partial<
-  Record<
-    SaleDetail['status'],
-    {
-      key: 'pos.receipt.refundedBanner' | 'pos.receipt.cancelledBanner' | 'pos.receipt.heldBanner';
-      tone: 'danger' | 'warning';
-    }
->
+  Record<SaleDetail['status'], { key: BannerKey; tone: 'danger' | 'warning' }>
 > = {
   REFUNDED: { key: 'pos.receipt.refundedBanner', tone: 'danger' },
   CANCELLED: { key: 'pos.receipt.cancelledBanner', tone: 'danger' },
   HELD: { key: 'pos.receipt.heldBanner', tone: 'warning' },
 };
+
+/** A refund that deliberately skipped inventory restoration reads differently. */
+function resolveBanner(
+  sale: SaleDetail,
+): { key: BannerKey; tone: 'danger' | 'warning' } | undefined {
+  if (sale.status === 'REFUNDED' && sale.inventoryRestored === false) {
+    return { key: 'pos.receipt.refundedNoRestockBanner', tone: 'danger' };
+  }
+  return STATUS_BANNER[sale.status];
+}
 
 /** Semantic tone for the lifecycle status label. */
 const STATUS_TONE: Record<SaleDetail['status'], 'success' | 'warning' | 'danger'> = {
@@ -83,7 +93,7 @@ export function ReceiptView({
   const { t } = useTranslation();
   const theme = useTheme();
 
-  const banner = STATUS_BANNER[sale.status];
+  const banner = resolveBanner(sale);
   const sectionTestId = (name: string): string | undefined =>
     testID != null ? `${testID}-${name}` : undefined;
 

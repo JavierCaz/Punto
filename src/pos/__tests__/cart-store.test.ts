@@ -51,6 +51,7 @@ const detail = (overrides: Partial<SaleDetail> = {}): SaleDetail => ({
   completedAt: null,
   cancelledAt: null,
   refundedAt: null,
+  inventoryRestored: null,
   items: [
     {
       id: 'si-1',

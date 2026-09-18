@@ -212,10 +212,15 @@ export default {
       loadFailed: 'No pudimos cargar el recibo.',
       refund: 'Reembolsar venta',
       refundConfirmTitle: '¿Reembolsar esta venta?',
-      refundConfirmMessage: 'El stock vendido se devolverá al inventario. Esta acción no se puede deshacer.',
+      refundConfirmMessage:
+        'Elige si el stock vendido debe volver al inventario. Esta acción no se puede deshacer.',
+      refundRestoreInventory: 'Devolver stock al inventario',
+      refundRestoreInventoryHint:
+        'Actívalo solo si los productos o ingredientes se pueden volver a vender.',
       refundDone: 'Venta reembolsada',
       refundFailed: 'No pudimos reembolsar la venta.',
       refundedBanner: 'Esta venta fue reembolsada',
+      refundedNoRestockBanner: 'Esta venta fue reembolsada sin devolver el inventario',
       cancelledBanner: 'Esta venta fue cancelada',
       heldBanner: 'Esta venta está en espera',
     },

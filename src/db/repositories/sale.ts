@@ -13,7 +13,7 @@ import { nowIso } from '@/db/repositories/clock';
 import type { DatabaseAdapter, SqlValue } from '@/db/repositories/database';
 import { REPO_ERROR, mapSqliteError, repoError } from '@/db/repositories/errors';
 import { newId } from '@/db/repositories/ids';
-import { int, intOrNull, str, strOrNull } from '@/db/repositories/mappers';
+import { boolFromInt, int, intBool, intOrNull, str, strOrNull } from '@/db/repositories/mappers';
 import { recordMovementWithTxn } from '@/db/repositories/movement';
 import { DEFAULT_PAGE_LIMIT, encodeCursor, keysetWhere } from '@/db/repositories/pagination';
 import type { Page, PageQuery } from '@/db/repositories/pagination';
@@ -71,6 +71,8 @@ interface SaleRow {
   completed_at: string | null;
   cancelled_at: string | null;
   refunded_at: string | null;
+  /** 0/1 on REFUNDED sales; null while not refunded. See migration 003. */
+  inventory_restored: number | null;
 }
 
 interface SaleItemRow {
@@ -102,7 +104,7 @@ interface PaymentRow {
 const SALE_COLUMNS = `
   id, business_id, sale_number, status, subtotal_minor, discount_minor,
   tax_minor, total_minor, employee_id, notes, created_at, updated_at,
-  completed_at, cancelled_at, refunded_at`;
+  completed_at, cancelled_at, refunded_at, inventory_restored`;
 
 const SALE_ITEM_COLUMNS = `
   id, sale_id, product_id, product_name, quantity, unit_price_minor,
@@ -140,6 +142,7 @@ function mapSaleRow(row: Record<string, unknown>): SaleRow {
     completed_at: strOrNull(row.completed_at),
     cancelled_at: strOrNull(row.cancelled_at),
     refunded_at: strOrNull(row.refunded_at),
+    inventory_restored: intOrNull(row.inventory_restored),
   };
 }
 
@@ -191,6 +194,7 @@ const toSale = (row: SaleRow) => ({
   completedAt: row.completed_at,
   cancelledAt: row.cancelled_at,
   refundedAt: row.refunded_at,
+  inventoryRestored: row.inventory_restored == null ? null : boolFromInt(row.inventory_restored),
 });
 
 const toSaleItem = (row: SaleItemRow) => ({
@@ -962,17 +966,22 @@ async function expireStaleHeldSalesWithTxn(
 }
 
 /**
- * Refund a COMPLETED sale. Reads the original `SALE` movements for this sale
- * and posts inverting `RETURN` movements (positive signed quantity → stock
- * comes back), then flips the status to REFUNDED.
+ * Refund a COMPLETED sale. By default, reads the original `SALE` movements for
+ * this sale and posts inverting `RETURN` movements (positive signed quantity →
+ * stock comes back), then flips the status to REFUNDED.
  *
- * NOTE (v1): refunds invert via the inventory ledger only — there is NO
- * payment reversal here; money reconciliation is out of scope until a later
- * phase.
+ * Pass `restoreInventory: false` when the returned products/ingredients are no
+ * longer sellable: the ledger inversion is skipped and the sale records
+ * `inventory_restored = 0`, leaving the original SALE movements as the record
+ * of consumption (posting a RETURN would double-count stock that never came
+ * back).
+ *
+ * NOTE (v1): refunds never reverse payments — money reconciliation is out of
+ * scope until a later phase.
  */
 export async function refundSale(
   saleId: string,
-  input?: { reason?: string; employeeId?: string },
+  input?: { reason?: string; employeeId?: string; restoreInventory?: boolean },
 ): Promise<void> {
   const businessId = await getBusinessId();
   await withTransaction((txn) => refundSaleWithTxn(txn, businessId, saleId, input ?? {}));
@@ -982,7 +991,7 @@ async function refundSaleWithTxn(
   txn: DatabaseAdapter,
   businessId: string,
   saleId: string,
-  input: { reason?: string; employeeId?: string },
+  input: { reason?: string; employeeId?: string; restoreInventory?: boolean },
 ): Promise<void> {
   const saleRow = await txn.getFirstAsync<Record<string, unknown>>(
     `SELECT ${SALE_COLUMNS} FROM sale WHERE id = ? AND business_id = ? LIMIT 1`,
@@ -995,40 +1004,49 @@ async function refundSaleWithTxn(
   const sale = mapSaleRow(saleRow);
   assertStatus(sale.status, 'COMPLETED');
 
-  // The original stock-out movements for this sale, to invert. SALE movements
-  // are negative; RETURN movements are their exact positive negation.
-  const movements = await txn.getAllAsync<{
-    inventory_item_id: string;
-    quantity: number;
-    unit_cost_minor: number;
-  }>(
-    `SELECT inventory_item_id, quantity, unit_cost_minor FROM inventory_movement
-      WHERE reference_type = 'sale' AND reference_id = ? AND type = 'SALE'
-        AND business_id = ?`,
-    saleId,
-    businessId,
-  );
-
+  // Restoring stock is opt-in at the call site. When disabled, the original
+  // SALE movements remain the record of consumption, so no compensating
+  // movement is posted.
+  const restoreInventory = input.restoreInventory ?? true;
   const employeeId = input.employeeId ?? sale.employee_id;
-  for (const movement of movements) {
-    await recordMovementWithTxn(txn, businessId, {
-      inventoryItemId: movement.inventory_item_id,
-      type: 'RETURN',
-      quantity: -movement.quantity, // invert the (negative) SALE → positive RETURN
-      unitCostMinor: movement.unit_cost_minor,
-      referenceType: 'sale',
-      referenceId: saleId,
-      employeeId: employeeId ?? undefined,
-    });
+
+  if (restoreInventory) {
+    // The original stock-out movements for this sale, to invert. SALE movements
+    // are negative; RETURN movements are their exact positive negation.
+    const movements = await txn.getAllAsync<{
+      inventory_item_id: string;
+      quantity: number;
+      unit_cost_minor: number;
+    }>(
+      `SELECT inventory_item_id, quantity, unit_cost_minor FROM inventory_movement
+        WHERE reference_type = 'sale' AND reference_id = ? AND type = 'SALE'
+          AND business_id = ?`,
+      saleId,
+      businessId,
+    );
+
+    for (const movement of movements) {
+      await recordMovementWithTxn(txn, businessId, {
+        inventoryItemId: movement.inventory_item_id,
+        type: 'RETURN',
+        quantity: -movement.quantity, // invert the (negative) SALE → positive RETURN
+        unitCostMinor: movement.unit_cost_minor,
+        referenceType: 'sale',
+        referenceId: saleId,
+        employeeId: employeeId ?? undefined,
+      });
+    }
   }
 
   const timestamp = nowIso();
   try {
     await txn.runAsync(
-      `UPDATE sale SET status = 'REFUNDED', refunded_at = ?, updated_at = ?
+      `UPDATE sale
+          SET status = 'REFUNDED', refunded_at = ?, updated_at = ?, inventory_restored = ?
         WHERE id = ? AND business_id = ?`,
       timestamp,
       timestamp,
+      intBool(restoreInventory),
       saleId,
       businessId,
     );

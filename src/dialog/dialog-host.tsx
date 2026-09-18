@@ -11,6 +11,8 @@ import { useDialogStore } from './dialog-store';
 export function DialogHost() {
   const { t } = useTranslation();
   const dialog = useDialogStore((state) => state.dialog);
+  const toggleValue = useDialogStore((state) => state.toggleValue);
+  const setToggleValue = useDialogStore((state) => state.setToggleValue);
   const close = useDialogStore((state) => state.close);
 
   if (dialog == null) {
@@ -40,6 +42,7 @@ export function DialogHost() {
     confirmLabel,
     cancelLabel,
     confirmTone,
+    toggle,
     onConfirm,
     onCancel,
   } = dialog.options;
@@ -52,7 +55,7 @@ export function DialogHost() {
   };
   const handleConfirm = (): void => {
     close();
-    onConfirm();
+    onConfirm(toggleValue);
   };
 
   return (
@@ -61,6 +64,11 @@ export function DialogHost() {
       tone={tone}
       title={title}
       message={message}
+      toggleLabel={toggle?.label}
+      toggleHint={toggle?.hint}
+      toggleValue={toggleValue}
+      onToggleChange={setToggleValue}
+      toggleTestID={toggle?.testID}
       primaryLabel={confirmLabel ?? t('common.actions.confirm')}
       primaryTone={confirmTone}
       onPrimaryPress={handleConfirm}

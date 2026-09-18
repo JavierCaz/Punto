@@ -107,4 +107,23 @@ describe('DialogHost', () => {
 
     await waitFor(() => expect(getByText('No se pudo eliminar')).toBeTruthy());
   });
+
+  it('seeds the toggle from options and passes its live value to onConfirm', async () => {
+    const onConfirm = jest.fn();
+    const { getByTestId } = await render(<DialogHost />);
+
+    await act(async () => {
+      showConfirm({
+        title: '¿Reembolsar esta venta?',
+        toggle: { label: 'Devolver stock al inventario', value: true, testID: 'dialog-toggle' },
+        onConfirm,
+      });
+    });
+
+    // Seeded ON from options, then switched OFF by the user.
+    await fireEvent(getByTestId('dialog-toggle'), 'valueChange', false);
+    await fireEvent.press(getByTestId('app-dialog-confirm'));
+
+    expect(onConfirm).toHaveBeenCalledWith(false);
+  });
 });
