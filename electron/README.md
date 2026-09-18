@@ -130,4 +130,9 @@ Beyond the headers, `main.js` hardens the runtime on every launch:
   `undefined`) and the UI stays blank. `src/app/_layout.tsx` therefore opens the
   app database before hydrating the `expo-sqlite/kv-store`-backed stores; keep
   that ordering. Unfixed upstream as of expo-sqlite 57.0.3.
-  the static bundle, not the Metro dev server.
+  - **Charts (Skia) on web need CanvasKit first.** `@shopify/react-native-skia`
+  builds its web API once, at import time, from `global.CanvasKit`; importing
+  `victory-native` before CanvasKit is ready makes every chart call throw
+  (`XYWHRect` of `undefined`). `src/lib/skia-web.ts` loads the bundled CanvasKit
+  wasm and the dashboard lazy-imports its charts through it. Keep chart modules
+  out of static imports.

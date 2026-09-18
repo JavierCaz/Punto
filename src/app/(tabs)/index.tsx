@@ -1,12 +1,10 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { listActiveEmployees, useAuthStore, type PublicEmployee } from '@/auth';
-import { IncomeTrendChart } from '@/components/charts/income-trend-chart';
-import { TopProductsChart } from '@/components/charts/top-products-chart';
 import { Screen } from '@/components/screen';
 import { SecondaryButton } from '@/components/secondary-button';
 import { SectionHeader } from '@/components/section-header';
@@ -21,6 +19,30 @@ import { useDashboard } from '@/hooks/use-dashboard';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate, formatMoney } from '@/i18n/format';
 import { DASHBOARD_PERIODS, type DashboardPeriod } from '@/lib/dashboard';
+import { ensureSkiaWeb } from '@/lib/skia-web';
+
+/**
+ * Charts are loaded lazily so that `victory-native` → `@shopify/react-native-skia`
+ * is imported only after CanvasKit is ready on web (`ensureSkiaWeb`). Importing
+ * it eagerly builds Skia's API from an undefined `global.CanvasKit`, after which
+ * every chart call throws. See `@/lib/skia-web`.
+ */
+const IncomeTrendChart = lazy(async () => {
+  await ensureSkiaWeb();
+  // Metro's `require` is lazy — the module factory runs on first call — so this
+  // still defers Skia until CanvasKit is ready, and unlike `import()` it also
+  // works under Jest's CommonJS runtime.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const chartModule = require('@/components/charts/income-trend-chart') as typeof import('@/components/charts/income-trend-chart');
+  return { default: chartModule.IncomeTrendChart };
+});
+
+const TopProductsChart = lazy(async () => {
+  await ensureSkiaWeb();
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const chartModule = require('@/components/charts/top-products-chart') as typeof import('@/components/charts/top-products-chart');
+  return { default: chartModule.TopProductsChart };
+});
 
 /**
  * Resumen (Dashboard) — the owner's at-a-glance answer to "how is my business
@@ -324,12 +346,14 @@ export default function DashboardScreen() {
       <View style={styles.section}>
         <SectionHeader level="section" title={t('dashboard.trendTitle')} />
         <ThemedView type="backgroundElement" style={[styles.chartCard, { borderColor: theme.border }]}>
-          <IncomeTrendChart
-            data={trend}
-            period={period}
-            currency={currency}
-            testID="dashboard-trend-chart"
-          />
+          <Suspense fallback={<ActivityIndicator />}>
+            <IncomeTrendChart
+              data={trend}
+              period={period}
+              currency={currency}
+              testID="dashboard-trend-chart"
+            />
+          </Suspense>
         </ThemedView>
       </View>
 
@@ -337,7 +361,9 @@ export default function DashboardScreen() {
         <SectionHeader level="section" title={t('dashboard.topProductsTitle')} />
         <ThemedView type="backgroundElement" style={[styles.chartCard, { borderColor: theme.border }]}>
           {topProducts.length > 0 ? (
-            <TopProductsChart data={topProducts} testID="dashboard-top-products-chart" />
+            <Suspense fallback={<ActivityIndicator />}>
+              <TopProductsChart data={topProducts} testID="dashboard-top-products-chart" />
+            </Suspense>
           ) : (
             <ThemedText type="body2" themeColor="textSecondary">
               {t('dashboard.topProductsEmpty')}

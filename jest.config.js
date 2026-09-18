@@ -6,6 +6,9 @@ module.exports = {
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|react-native-reanimated|react-native-worklets|victory-native|@noble/hashes))',
   ],
   moduleNameMapper: {
+    // Jest has no asset transform for `.wasm` (unlike images/fonts), so map the
+    // CanvasKit asset import to a plain string stub.
+    '\\.wasm$': '<rootDir>/jest/wasmMock.ts',
     // Force the pure-JS PBKDF2 reference in tests: Jest's React Native haste
     // config resolves `.native.ts` platform files, which would load the native
     // quick-crypto module (and its Nitro runtime) that does not exist under Node.
