@@ -61,6 +61,7 @@ describe('migration registry', () => {
       'financial_category',
       'financial_transaction',
       'employee',
+      'cash_session',
       'app_metadata',
     ];
 
@@ -122,5 +123,15 @@ describe('migration registry', () => {
     expect(sql).toMatch(/ALTER TABLE employee ADD COLUMN authorization_pin_hash TEXT/);
     expect(sql).toMatch(/ALTER TABLE sale ADD COLUMN refund_authorized_by TEXT/);
     expect(sql).toMatch(/REFERENCES employee\(id\) ON DELETE SET NULL/);
+  });
+
+  it('creates the cash_session table and tags payments (migration 005)', () => {
+    const sql = migrations.flatMap((m: Migration) => m.up).join('\n');
+
+    expect(sql).toMatch(/CREATE TABLE cash_session\b/);
+    expect(sql).toMatch(/ALTER TABLE payment ADD COLUMN cash_session_id TEXT/);
+    expect(sql).toMatch(/REFERENCES cash_session\(id\) ON DELETE SET NULL/);
+    expect(sql).toMatch(/CREATE INDEX idx_cash_session_business_status/);
+    expect(sql).toMatch(/opening_amount_minor\s+INTEGER NOT NULL/);
   });
 });

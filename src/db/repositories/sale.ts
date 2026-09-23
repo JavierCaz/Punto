@@ -719,6 +719,8 @@ async function removeSaleItemWithTxn(
 export async function completeSale(input: {
   saleId: string;
   employeeId?: string;
+  /** Active cash session id; tagged onto every payment when present. */
+  cashSessionId?: string | null;
   payments: PaymentInput[];
 }): Promise<SaleDetail> {
   const businessId = await getBusinessId();
@@ -728,7 +730,7 @@ export async function completeSale(input: {
 async function completeSaleWithTxn(
   txn: DatabaseAdapter,
   businessId: string,
-  input: { saleId: string; employeeId?: string; payments: PaymentInput[] },
+  input: { saleId: string; employeeId?: string; cashSessionId?: string | null; payments: PaymentInput[] },
 ): Promise<SaleDetail> {
   // 1. Load the sale; must exist and still be HELD.
   const saleRow = await txn.getFirstAsync<Record<string, unknown>>(
@@ -804,8 +806,8 @@ async function completeSaleWithTxn(
       await txn.runAsync(
         `INSERT INTO payment
            (id, business_id, sale_id, payment_method_id, amount_minor,
-            amount_given_minor, reference, notes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            amount_given_minor, reference, notes, created_at, cash_session_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         newId(),
         businessId,
         input.saleId,
@@ -815,6 +817,7 @@ async function completeSaleWithTxn(
         payment.reference ?? null,
         payment.notes ?? null,
         timestamp,
+        input.cashSessionId ?? null,
       );
     } catch (error) {
       throw mapSqliteError(error);
@@ -862,6 +865,8 @@ export async function checkoutSale(input: {
   payments: PaymentInput[];
   employeeId?: string;
   notes?: string;
+  /** Active cash session id; tagged onto every payment when present. */
+  cashSessionId?: string | null;
 }): Promise<SaleDetail> {
   const businessId = await getBusinessId();
   return withTransaction(async (txn) => {
@@ -873,6 +878,7 @@ export async function checkoutSale(input: {
     return completeSaleWithTxn(txn, businessId, {
       saleId: sale.id,
       employeeId: input.employeeId,
+      cashSessionId: input.cashSessionId,
       payments: input.payments,
     });
   });

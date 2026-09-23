@@ -210,6 +210,7 @@ describe('cart store — checkout and discard', () => {
       items: [expect.objectContaining({ productId: 'p1', quantity: 1000 })],
       payments: [{ paymentMethodId: 'pm-cash', amountMinor: 500, amountGivenMinor: 500 }],
       employeeId: undefined,
+      cashSessionId: null,
     });
     expect(result).toBe(completed);
     expect(useCartStore.getState().lines).toHaveLength(0);
@@ -227,6 +228,7 @@ describe('cart store — checkout and discard', () => {
     expect(mockCompleteSale).toHaveBeenCalledWith({
       saleId: 'sale-1',
       employeeId: undefined,
+      cashSessionId: null,
       payments: [{ paymentMethodId: 'pm-card', amountMinor: 500 }],
     });
     expect(mockCheckoutSale).not.toHaveBeenCalled();

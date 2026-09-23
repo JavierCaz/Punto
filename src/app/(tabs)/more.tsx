@@ -59,6 +59,19 @@ export default function MoreScreen() {
                 </ThemedText>
               </View>
             </View>
+            {canManageSettings ? (
+              <>
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
+                <ListRow
+                  icon="shield-key-outline"
+                  title={t('settings.authorizationPin')}
+                  subtitle={t('settings.authorizationPinSubtitle')}
+                  onPress={() => router.push('/manager-pin')}
+                  trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+                  testID="account-manager-pin-row"
+                />
+              </>
+            ) : null}
           </ThemedView>
         </View>
       ) : null}
@@ -134,7 +147,16 @@ export default function MoreScreen() {
               title={t('more.expenses')}
               subtitle={t('more.expensesSubtitle')}
               onPress={() => router.push('/expenses')}
+              divided
               trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+            />
+            <ListRow
+              icon="cash-register"
+              title={t('cashSession.more.title')}
+              subtitle={t('cashSession.more.subtitle')}
+              onPress={() => router.push('/cash-session')}
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+              testID="more-cash-session-row"
             />
           </ThemedView>
         </View>
@@ -213,5 +235,9 @@ const styles = StyleSheet.create({
   accountText: {
     flex: 1,
     gap: Spacing.half,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: Spacing.three,
   },
 });

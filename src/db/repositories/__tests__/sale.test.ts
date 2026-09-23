@@ -369,6 +369,7 @@ describe('sale repository', () => {
         null, // reference
         null, // notes
         expect.any(String), // created_at
+        null, // cash_session_id (no active session)
       ]);
 
       // Three SALE movements: bridge (-1000) + ing-1 (-1000) + ing-2 (-500).

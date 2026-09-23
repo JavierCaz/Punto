@@ -12841,7 +12841,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/app/cash-session/index.tsx",
-      "source_location": "L281"
+      "source_location": "L277"
     },
     {
       "id": "src_app_expenses_edit",
@@ -19529,7 +19529,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/app/settings.tsx",
-      "source_location": "L72"
+      "source_location": "L86"
     },
     {
       "id": "src_app_suppliers_index",
@@ -19573,7 +19573,7 @@
       "file_type": "code",
       "norm_label": "styles",
       "source_file": "src/app/(tabs)/more.tsx",
-      "source_location": "L212"
+      "source_location": "L203"
     },
     {
       "id": "src_app_team_add",
@@ -23847,126 +23847,6 @@
       "type": "external"
     },
     {
-      "id": "src_db_index_databaseadapter",
-      "label": "src_db_index_databaseadapter",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_databaseadapter",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_getbusinessid",
-      "label": "src_db_index_getbusinessid",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_getbusinessid",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_int",
-      "label": "src_db_index_int",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_int",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_intornull",
-      "label": "src_db_index_intornull",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_intornull",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_mapsqliteerror",
-      "label": "src_db_index_mapsqliteerror",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_mapsqliteerror",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_newid",
-      "label": "src_db_index_newid",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_newid",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_nowiso",
-      "label": "src_db_index_nowiso",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_nowiso",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_repoerror",
-      "label": "src_db_index_repoerror",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_repoerror",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_str",
-      "label": "src_db_index_str",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_str",
-      "source_file": "",
-      "type": "external"
-    },
-    {
-      "id": "src_db_index_strornull",
-      "label": "src_db_index_strornull",
-      "_origin": "semantic",
-      "community": 4,
-      "community_name": "cash-session-repository.ts",
-      "external": true,
-      "file_type": "concept",
-      "norm_label": "src_db_index_strornull",
-      "source_file": "",
-      "type": "external"
-    },
-    {
       "id": "src_db_index_withtransaction",
       "label": "src_db_index_withtransaction",
       "_origin": "semantic",
@@ -24793,6 +24673,116 @@
       "norm_label": "src_db_index_salestotals",
       "source_file": "",
       "type": "external"
+    },
+    {
+      "id": "src_db_index_databaseadapter",
+      "label": "src_db_index_databaseadapter",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_databaseadapter",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_getbusinessid",
+      "label": "src_db_index_getbusinessid",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_getbusinessid",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_int",
+      "label": "src_db_index_int",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_int",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_intornull",
+      "label": "src_db_index_intornull",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_intornull",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_mapsqliteerror",
+      "label": "src_db_index_mapsqliteerror",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_mapsqliteerror",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_newid",
+      "label": "src_db_index_newid",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_newid",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_nowiso",
+      "label": "src_db_index_nowiso",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_nowiso",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_repoerror",
+      "label": "src_db_index_repoerror",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_repoerror",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_str",
+      "label": "src_db_index_str",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_str",
+      "source_file": "",
+      "type": "external"
+    },
+    {
+      "id": "src_db_index_strornull",
+      "label": "src_db_index_strornull",
+      "community": 4,
+      "community_name": "cash-session-repository.ts",
+      "external": true,
+      "file_type": "concept",
+      "norm_label": "src_db_index_strornull",
+      "source_file": "",
+      "type": "external"
     }
   ],
   "links": [
@@ -25525,7 +25515,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/cash-session/index.tsx",
-      "source_location": "L164",
+      "source_location": "L160",
       "weight": 1.0
     },
     {
@@ -25537,7 +25527,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/cash-session/index.tsx",
-      "source_location": "L168",
+      "source_location": "L164",
       "weight": 1.0
     },
     {
@@ -25549,7 +25539,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/cash-session/index.tsx",
-      "source_location": "L216",
+      "source_location": "L212",
       "weight": 1.0
     },
     {
@@ -100531,7 +100521,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/cash-session/index.tsx",
-      "source_location": "L281",
+      "source_location": "L277",
       "weight": 1.0
     },
     {
@@ -101147,7 +101137,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/settings.tsx",
-      "source_location": "L72",
+      "source_location": "L86",
       "weight": 1.0
     },
     {
@@ -101471,6 +101461,17 @@
     },
     {
       "source": "src_app_tabs_more",
+      "target": "src_app_tabs_more_styles",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/(tabs)/more.tsx",
+      "source_location": "L203",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_tabs_more",
       "target": "src_app_tabs_more_morescreen",
       "relation": "contains",
       "_origin": "ast",
@@ -101478,17 +101479,6 @@
       "confidence_score": 1.0,
       "source_file": "src/app/(tabs)/more.tsx",
       "source_location": "L21",
-      "weight": 1.0
-    },
-    {
-      "source": "src_app_tabs_more",
-      "target": "src_app_tabs_more_styles",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/app/(tabs)/more.tsx",
-      "source_location": "L212",
       "weight": 1.0
     },
     {

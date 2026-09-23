@@ -15,6 +15,8 @@ import { ThemedView } from '@/components/themed-view';
 import { HELD_SALE_TTL_HOURS } from '@/db';
 
 import { Radius, Spacing, TouchTarget } from '@/constants/theme';
+import { useDurationLabel } from '@/cash-session/use-duration-label';
+import { useCashSessionStore } from '@/cash-session/cash-session-store';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate, formatMoney } from '@/i18n/format';
@@ -96,6 +98,7 @@ function PeriodChip({
 }
 export default function DashboardScreen() {
   const { t } = useTranslation();
+  const durationLabel = useDurationLabel();
   const theme = useTheme();
   const user = useAuthStore((state) => state.user);
   const {
@@ -110,6 +113,8 @@ export default function DashboardScreen() {
   } = useDashboard();
 
   const isAdmin = user?.role === 'ADMIN';
+  const activeCashSession = useCashSessionStore((state) => state.activeSession);
+  const hasCashHistory = useCashSessionStore((state) => state.hasHistory);
   const [employees, setEmployees] = useState<PublicEmployee[]>([]);
 
   useEffect(() => {
@@ -124,6 +129,7 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       void reload();
+      void useCashSessionStore.getState().refresh();
     }, [reload]),
   );
 
@@ -203,6 +209,19 @@ export default function DashboardScreen() {
           {formatDate(new Date().toISOString())}
         </ThemedText>
       </View>
+
+      {activeCashSession ? (
+        <ThemedText type="body2" themeColor="textSecondary" testID="dashboard-cash-session">
+          {t('cashSession.dashboard.active', {
+            amount: formatMoney(activeCashSession.openingAmountMinor, model.currency),
+            duration: durationLabel(activeCashSession.openedAt),
+          })}
+        </ThemedText>
+      ) : hasCashHistory ? (
+        <ThemedText type="body2" themeColor="textSecondary" testID="dashboard-cash-session">
+          {t('cashSession.dashboard.closed')}
+        </ThemedText>
+      ) : null}
 
       {/* Needs your attention first: problems are actionable and point-in-time. */}
       <View style={styles.section}>

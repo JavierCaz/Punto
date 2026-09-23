@@ -6,6 +6,8 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, useWindowDimensions
 
 import { listActiveEmployees, useAuthStore, useCan } from '@/auth';
 import { BottomSheet } from '@/components/bottom-sheet';
+import { CashSessionBanner } from '@/components/cash-session-banner';
+import { CashSessionOpenSheet } from '@/components/cash-session-open-sheet';
 import { CartPanel } from '@/components/cart-panel';
 import { CatalogFilterBar } from '@/components/catalog-filter-bar';
 import { EmptyState } from '@/components/empty-state';
@@ -34,6 +36,7 @@ import { i18n } from '@/i18n';
 import { filterProducts } from '@/lib/catalog-form';
 import { cartItemCount, cartSubtotalMinor } from '@/pos/cart-math';
 import { useCartStore } from '@/pos/cart-store';
+import { useCashSessionStore } from '@/cash-session/cash-session-store';
 
 const TABLET_BREAKPOINT = 768;
 const CART_PANE_WIDTH = 360;
@@ -66,6 +69,10 @@ export default function PosScreen() {
   const [heldSales, setHeldSales] = useState<Sale[]>([]);
   const [employees, setEmployees] = useState<Awaited<ReturnType<typeof listActiveEmployees>>>([]);
   const [heldPulseToken, setHeldPulseToken] = useState(0);
+  const [cashSessionOpenSheet, setCashSessionOpenSheet] = useState(false);
+  const [cashPromptDismissed, setCashPromptDismissed] = useState(false);
+  const activeCashSession = useCashSessionStore((state) => state.activeSession);
+  const hasCashHistory = useCashSessionStore((state) => state.hasHistory);
 
   const lines = useCartStore((state) => state.lines);
   const busy = useCartStore((state) => state.busy);
@@ -127,6 +134,8 @@ export default function PosScreen() {
       void reload();
       void loadHeld();
       void loadPaymentMethods();
+      void useCashSessionStore.getState().refresh();
+      setCashPromptDismissed(false);
       void listActiveEmployees()
         .then(setEmployees)
         .catch(() => setEmployees([]));
@@ -147,7 +156,7 @@ export default function PosScreen() {
   };
 
   const handlePaymentSubmit = async (payments: PaymentInput[]): Promise<void> => {
-    const detail = await checkout(payments);
+    const detail = await checkout(payments, useCashSessionStore.getState().activeSession?.id ?? null);
     if (!detail) {
       return;
     }
@@ -329,6 +338,15 @@ export default function PosScreen() {
           ) : null}
         </View>
 
+        <CashSessionBanner
+          activeSession={activeCashSession}
+          hasHistory={hasCashHistory}
+          dismissed={cashPromptDismissed}
+          onOpen={() => setCashSessionOpenSheet(true)}
+          onClose={() => router.push('/cash-session/close')}
+          onDismiss={() => setCashPromptDismissed(true)}
+        />
+
         {products.length > 0 ? (
           <CatalogFilterBar
             search={search}
@@ -418,6 +436,13 @@ export default function PosScreen() {
         testID="employee-sheet">
         <View>{employeeSheetContent}</View>
       </BottomSheet>
+
+      <CashSessionOpenSheet
+        visible={cashSessionOpenSheet}
+        onClose={() => setCashSessionOpenSheet(false)}
+        onOpened={() => setCashSessionOpenSheet(false)}
+        employeeId={user?.id}
+      />
     </>
   );
 }

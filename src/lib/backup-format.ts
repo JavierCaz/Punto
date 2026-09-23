@@ -56,6 +56,7 @@ export const BACKUP_TABLES = [
   'purchase_item',
   'financial_transaction',
   'sale_item',
+  'cash_session',
   'payment',
   'app_metadata',
 ] as const;

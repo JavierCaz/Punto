@@ -70,7 +70,7 @@ interface CartState {
   hold: () => Promise<void>;
   resume: (saleId: string) => Promise<void>;
   discard: () => Promise<void>;
-  checkout: (payments: PaymentInput[]) => Promise<SaleDetail | null>;
+  checkout: (payments: PaymentInput[], cashSessionId?: string | null) => Promise<SaleDetail | null>;
   setEmployee: (employeeId: string | null) => void;
   reset: () => void;
 }
@@ -277,7 +277,7 @@ export const useCartStore = create<CartState>()((set, get) => {
       }
     },
 
-    checkout: async (payments) => {
+    checkout: async (payments, cashSessionId) => {
       const { saleId, lines, employeeId } = get();
       if (lines.length === 0) {
         set({ error: { operation: 'charge', code: 'empty-cart' } });
@@ -289,12 +289,14 @@ export const useCartStore = create<CartState>()((set, get) => {
           ? await completeSale({
               saleId,
               employeeId: employeeId ?? undefined,
+              cashSessionId: cashSessionId ?? null,
               payments,
             })
           : await checkoutSale({
               items: lines.map(cartLineToSaleItemInput),
               payments,
               employeeId: employeeId ?? undefined,
+              cashSessionId: cashSessionId ?? null,
             });
         get().reset();
         return detail;

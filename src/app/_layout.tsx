@@ -158,6 +158,7 @@ export default function RootLayout() {
               <Stack.Screen name="purchases" />
               <Stack.Screen name="expenses" />
               <Stack.Screen name="receipt" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="cash-session" />
             </Stack.Protected>
 
             {/* Admin-only: Settings + Data (backup). Employees never mount these. */}

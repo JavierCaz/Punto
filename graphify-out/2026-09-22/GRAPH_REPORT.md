@@ -1,7 +1,7 @@
 # Graph Report - punto  (2026-09-22)
 
 ## Corpus Check
-- 295 files · ~217,652 words
+- 295 files · ~217,624 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 6 file(s) not represented in the graph (top: (none) 4, .css 2)
 
