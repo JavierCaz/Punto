@@ -56,7 +56,7 @@ export function localDayKey(iso: TimestampIso): string {
 
 /** Raw money inputs for a period, all POSITIVE minor units. */
 export interface DashboardTotalsInput {
-  /** Gross income from COMPLETED sales in the period. */
+  /** Gross income from paid sales (COMPLETED + REFUNDED, by completed_at). */
   salesMinor: number;
   /** Gross value of sales REFUNDED in the period (money back out). */
   refundsMinor: number;
@@ -152,7 +152,7 @@ export interface CompletedSaleRow {
 export interface TrendPoint {
   /** Stable bucket key: `YYYY-MM-DDTHH` (hour), `YYYY-MM-DD` (day) or `YYYY-MM` (month). */
   key: string;
-  /** Gross COMPLETED-sale income for the bucket, minor units. */
+  /** Gross paid-sale income for the bucket, minor units. */
   totalMinor: number;
 }
 

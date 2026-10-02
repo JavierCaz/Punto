@@ -28,6 +28,7 @@ export default function MoreScreen() {
   const canManageSettings = useCan('settings.manage');
   const canManageCatalog = useCan('catalog.manage');
   const canManageOperations = useCan('operations.manage');
+  const canViewFinance = useCan('dashboard.finance.view');
 
   const confirmSignOut = () => {
     showConfirm({
@@ -157,6 +158,22 @@ export default function MoreScreen() {
               onPress={() => router.push('/cash-session')}
               trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
               testID="more-cash-session-row"
+            />
+          </ThemedView>
+        </View>
+      ) : null}
+
+      {canViewFinance ? (
+        <View style={styles.section}>
+          <SectionHeader level="section" title={t('reports.title')} />
+          <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+            <ListRow
+              icon="file-chart-outline"
+              title={t('reports.more.title')}
+              subtitle={t('reports.more.subtitle')}
+              onPress={() => router.push('/reports')}
+              trailing={<MaterialCommunityIcons name="chevron-right" size={24} color={theme.textSecondary} />}
+              testID="more-reports-row"
             />
           </ThemedView>
         </View>

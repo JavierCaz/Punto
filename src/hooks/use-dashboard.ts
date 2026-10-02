@@ -36,9 +36,9 @@ export const DASHBOARD_TOP_PRODUCTS = 5;
  * section. When no employee is selected these equal the business-wide figures.
  */
 export interface SalesReport {
-  /** Gross COMPLETED sales in the period, minor units. */
+  /** Gross paid sales (COMPLETED + REFUNDED) in the period, minor units. */
   salesMinor: number;
-  /** Number of COMPLETED sales in the period. */
+  /** Number of paid sales (COMPLETED + REFUNDED) in the period. */
   salesCount: number;
   /** Average ticket, integer minor units (0 when there were no sales). */
   averageTicketMinor: number;

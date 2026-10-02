@@ -323,6 +323,22 @@ export type {
   TopProduct,
 } from '@/db/repositories/analytics';
 
+// Cash-flow report (monthly accountant PDF).
+export {
+  getCashflowReportData,
+  getGrossSalesTotals,
+  listFinancialEntriesInRange,
+  listPaymentTotalsByMethod,
+  listPurchasesInRange,
+} from '@/db/repositories/cashflow-report';
+export type {
+  CashflowReportData,
+  PaymentMethodTotal,
+  ReportFinancialEntry,
+  ReportPurchase,
+  ReportRange,
+} from '@/db/repositories/cashflow-report';
+
 // JSON backup (data portability: export / import / clear).
 export {
   clearAllData,

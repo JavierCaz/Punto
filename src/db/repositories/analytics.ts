@@ -14,8 +14,11 @@ import type { MoneyMinor, QuantityMilli, TimestampIso } from '@/db/repositories/
  * problems; the pure money math lives in `@/lib/dashboard`.
  *
  * Money accounting rules (small-business POS):
- * - Income is COMPLETED sales (`completed_at` in range) plus manual INCOME
- *   transactions.
+ * - Income is every sale that was paid — COMPLETED or later REFUNDED — keyed on
+ *   `completed_at`, plus manual INCOME transactions. A refund flips the status
+ *   to REFUNDED but never un-happens the original sale; it is subtracted once,
+ *   as a refund (below). Counting only COMPLETED here would drop the sale AND
+ *   subtract the refund, i.e. double-count it.
  * - Refunds count on the day they happened (`refunded_at` in range), so a sale
  *   completed yesterday but refunded today shows income yesterday and a refund
  *   today — never a retroactive rewrite of yesterday.
@@ -49,8 +52,7 @@ export interface SaleRange {
   employeeId?: string;
 }
 
-/** A COMPLETED sale reduced to what the income trend needs. */
-/** A COMPLETED sale reduced to what the income trend needs. */
+/** A paid (COMPLETED or REFUNDED) sale reduced to what the income trend needs. */
 export interface CompletedSalePoint {
   completedAt: TimestampIso;
   totalMinor: MoneyMinor;
@@ -64,7 +66,7 @@ export interface TopProduct {
 }
 
 
-/** Gross COMPLETED sales in the range (income basis). */
+/** Gross paid sales (COMPLETED + REFUNDED) in the range (income basis). */
 export async function getCompletedSalesTotals(range: SaleRange): Promise<PeriodTotals> {
   const db = await getDb();
   const businessId = await getBusinessId();
@@ -77,7 +79,7 @@ export async function getCompletedSalesTotals(range: SaleRange): Promise<PeriodT
     `SELECT COALESCE(SUM(total_minor), 0) AS completed_total,
             COUNT(*) AS completed_count
        FROM sale
-      WHERE business_id = ? AND status = 'COMPLETED'
+      WHERE business_id = ? AND status IN ('COMPLETED', 'REFUNDED')
         AND completed_at >= ? AND completed_at <= ?${employeeClause}`,
     ...params,
   );
@@ -146,7 +148,7 @@ export async function getPurchaseExpenseTotal(range: {
   return int(row?.purchase_total);
 }
 
-/** COMPLETED sales in the range, for local-day bucketing on the client. */
+/** Paid sales (COMPLETED + REFUNDED) in the range, for local-day bucketing on the client. */
 export async function listCompletedSalesInRange(range: SaleRange): Promise<CompletedSalePoint[]> {
   const db = await getDb();
   const businessId = await getBusinessId();
@@ -158,7 +160,7 @@ export async function listCompletedSalesInRange(range: SaleRange): Promise<Compl
   const rows = await db.getAllAsync<Record<string, unknown>>(
     `SELECT completed_at, total_minor
        FROM sale
-      WHERE business_id = ? AND status = 'COMPLETED'
+      WHERE business_id = ? AND status IN ('COMPLETED', 'REFUNDED')
         AND completed_at >= ? AND completed_at <= ?${employeeClause}
       ORDER BY completed_at ASC`,
     ...params,
@@ -169,7 +171,7 @@ export async function listCompletedSalesInRange(range: SaleRange): Promise<Compl
   }));
 }
 
-/** Best-selling products by revenue within the range (COMPLETED sales only). */
+/** Best-selling products by revenue within the range (paid sales: COMPLETED + REFUNDED). */
 export async function listTopProducts(
   range: SaleRange,
   limit = 5,
@@ -188,7 +190,7 @@ export async function listTopProducts(
             SUM(si.quantity) AS quantity_milli
        FROM sale_item si
        JOIN sale s ON s.id = si.sale_id
-      WHERE s.business_id = ? AND s.status = 'COMPLETED'
+      WHERE s.business_id = ? AND s.status IN ('COMPLETED', 'REFUNDED')
         AND s.completed_at >= ? AND s.completed_at <= ?${employeeClause}
       GROUP BY si.product_name
       ORDER BY revenue_minor DESC, si.product_name ASC

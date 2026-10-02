@@ -168,6 +168,11 @@ export default function RootLayout() {
               <Stack.Screen name="manager-pin" />
             </Stack.Protected>
 
+            {/* Financial reporting (monthly cash-flow PDF for the accountant). */}
+            <Stack.Protected guard={authPhase === 'ready' && can(user, 'dashboard.finance.view')}>
+              <Stack.Screen name="reports" />
+            </Stack.Protected>
+
             {/* Admin-only: team management. */}
             <Stack.Protected guard={authPhase === 'ready' && can(user, 'team.manage')}>
               <Stack.Screen name="team" />

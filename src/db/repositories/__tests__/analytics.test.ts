@@ -35,7 +35,7 @@ describe('analytics repository', () => {
     resetBusinessIdForTesting();
   });
 
-  it('getCompletedSalesTotals keys income on completed_at and COMPLETED status', async () => {
+  it('getCompletedSalesTotals keys income on completed_at over paid (COMPLETED + REFUNDED) sales', async () => {
     adapter.queueFirst('SELECT id FROM business', { id: 'biz-1' });
     adapter.queueFirst('AS completed_total', { completed_total: 100000, completed_count: 3 });
 
@@ -44,7 +44,9 @@ describe('analytics repository', () => {
     expect(result).toEqual({ totalMinor: 100000, count: 3 });
     const call = adapter.calls.find((c) => c.sql.includes('AS completed_total'));
     expect(call).toBeDefined();
-    expect(call!.sql).toContain("status = 'COMPLETED'");
+    // A refunded sale still happened: it stays in income and is subtracted
+    // once via getRefundedSalesTotals (never dropped AND subtracted).
+    expect(call!.sql).toContain("status IN ('COMPLETED', 'REFUNDED')");
     expect(call!.sql).toContain('completed_at >= ?');
     expect(call!.sql).toContain('completed_at <= ?');
     expect(call!.params).toEqual(['biz-1', RANGE.from, RANGE.to]);
@@ -107,6 +109,8 @@ describe('analytics repository', () => {
       { completedAt: '2026-09-08T15:00:00.000Z', totalMinor: 60000 },
       { completedAt: '2026-09-08T18:00:00.000Z', totalMinor: 40000 },
     ]);
+    const call = adapter.calls.find((c) => c.sql.includes('SELECT completed_at, total_minor'));
+    expect(call!.sql).toContain("status IN ('COMPLETED', 'REFUNDED')");
   });
 
   it('listTopProducts groups by product and applies the limit', async () => {
@@ -122,7 +126,7 @@ describe('analytics repository', () => {
     ]);
     const call = adapter.calls.find((c) => c.sql.includes('AS revenue_minor'));
     expect(call!.sql).toContain('JOIN sale s ON s.id = si.sale_id');
-    expect(call!.sql).toContain("s.status = 'COMPLETED'");
+    expect(call!.sql).toContain("s.status IN ('COMPLETED', 'REFUNDED')");
     expect(call!.sql).toContain('GROUP BY si.product_name');
     expect(call!.params).toEqual(['biz-1', RANGE.from, RANGE.to, 5]);
   });
